@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agrosmart-dashboard — HugMoss Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ======================= TITLE BAR ======================= -->
+  <header class="titlebar">
+    <div class="titlebar__left">
+      <span class="logo" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="lg" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#9d7bff"/><stop offset="1" stop-color="#6a48f2"/>
+          </linearGradient></defs>
+          <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="url(#lg)"/>
+          <path d="M8.8 7.4v9.2M15.2 7.4v9.2M8.8 12h6.4" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="wordmark">HugMoss</span>
+      <nav class="menubar" id="menubar" aria-label="Application menu">
+        <button class="menubar__item" data-menu="file">File</button>
+        <button class="menubar__item" data-menu="edit">Edit</button>
+        <button class="menubar__item" data-menu="selection">Selection</button>
+        <button class="menubar__item" data-menu="view">View</button>
+        <button class="menubar__item" data-menu="go">Go</button>
+        <button class="menubar__item" data-menu="run">Run</button>
+        <button class="menubar__item" data-menu="terminal">Terminal</button>
+        <button class="menubar__item" data-menu="help">Help</button>
+      </nav>
+    </div>
+    <div class="titlebar__center">
+      <button class="titlebar-search" id="titleSearch" aria-label="Search agrosmart-dashboard (Ctrl+K)">
+        <span class="titlebar-search__icon" id="titleSearchIcon"></span>
+        <span class="titlebar-search__text">Search agrosmart-dashboard</span>
+        <kbd>Ctrl+K</kbd>
+      </button>
+    </div>
+    <div class="titlebar__right">
+      <button class="tb-icon" id="toggleSidebarBtn" aria-label="Toggle sidebar (Alt+B)" data-tip="Toggle Sidebar"></button>
+      <button class="tb-icon" id="togglePanelBtn" aria-label="Toggle panel (Alt+J)" data-tip="Toggle Panel"></button>
+      <button class="tb-icon" id="toggleChatBtn" aria-label="Toggle agent chat (Alt+A)" data-tip="Toggle Agent Chat"></button>
+      <button class="tb-icon" id="themeToggle" aria-label="Toggle theme" data-tip="Toggle Theme"></button>
+      <div class="win-controls">
+        <button class="win-btn" aria-label="Minimize"><span class="win-btn__min"></span></button>
+        <button class="win-btn" aria-label="Maximize"><span class="win-btn__max"></span></button>
+        <button class="win-btn win-btn--close" aria-label="Close"><span class="win-btn__cls"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================= MAIN ======================= -->
+  <div class="main" id="main">
+
+    <!-- Activity bar -->
+    <nav class="activitybar" aria-label="Activity bar">
+      <div class="activitybar__group">
+        <button class="abtn abtn--active" data-view="explorer" aria-label="Explorer" data-tip="Explorer"><span class="abtn__icon" data-icon="files"></span></button>
+        <button class="abtn" data-view="search" aria-label="Search" data-tip="Search"><span class="abtn__icon" data-icon="search"></span></button>
+        <button class="abtn" data-view="scm" aria-label="Source Control" data-tip="Source Control"><span class="abtn__icon" data-icon="git"></span><span class="abtn__badge abtn__badge--danger" id="scmBadge">3</span></button>
+        <button class="abtn" data-view="debug" aria-label="Run and Debug" data-tip="Run and Debug"><span class="abtn__icon" data-icon="debug"></span></button>
+        <button class="abtn" data-view="extensions" aria-label="Extensions" data-tip="Extensions"><span class="abtn__icon" data-icon="extensions"></span></button>
+      </div>
+      <div class="activitybar__group activitybar__group--end">
+        <button class="abtn" id="abtnAgent" aria-label="Agent chat" data-tip="Agent (Alt+A)"><span class="abtn__icon" data-icon="sparkle"></span></button>
+        <button class="abtn abtn--avatar" id="abtnAccount" aria-label="Account: Vincent Iraguha" data-tip="Vincent Iraguha"><span class="avatar">VI</span></button>
+        <button class="abtn" id="abtnSettings" aria-label="Settings" data-tip="Settings"><span class="abtn__icon" data-icon="gear"></span></button>
+      </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+      <div class="sidebar__head"><h2 class="sidebar__title" id="sidebarTitle">Explorer</h2></div>
+
+      <div class="sidebar__view sidebar__view--active" id="view-explorer">
+        <div class="treesection">
+          <div class="treesection__head">
+            <button class="treesection__toggle" id="projectToggle" aria-label="Toggle project section"><span class="chev chev--open" data-icon="chevron"></span>PROJECT: AGROSMART-DASHBOARD</button>
+            <div class="treesection__actions">
+              <button class="sbtn" id="newFileBtn" aria-label="New File" data-tip="New File"><span data-icon="newfile"></span></button>
+              <button class="sbtn" id="newFolderBtn" aria-label="New Folder" data-tip="New Folder"><span data-icon="newfolder"></span></button>
+              <button class="sbtn" id="refreshBtn" aria-label="Refresh Explorer" data-tip="Refresh"><span data-icon="refresh"></span></button>
+              <button class="sbtn" id="collapseBtn" aria-label="Collapse Folders" data-tip="Collapse Folders"><span data-icon="collapse"></span></button>
+            </div>
+          </div>
+          <div class="tree" id="fileTree" role="tree"></div>
+        </div>
+        <div class="treesection">
+          <div class="treesection__head">
+            <button class="treesection__toggle" id="outlineToggle" aria-label="Toggle outline"><span class="chev chev--open" data-icon="chevron"></span>OUTLINE</button>
+          </div>
+          <div class="tree tree--sub" id="outlineTree"></div>
+        </div>
+        <div class="treesection">
+          <div class="treesection__head">
+            <button class="treesection__toggle" id="timelineToggle" aria-label="Toggle timeline"><span class="chev chev--open" data-icon="chevron"></span>TIMELINE</button>
+          </div>
+          <div class="tree tree--sub" id="timelineTree"></div>
+        </div>
+      </div>
+
+      <div class="sidebar__view" id="view-search">
+        <div class="searchbar">
+          <div class="searchbar__row">
+            <input type="text" id="searchInput" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search">
+            <div class="searchbar__toggles">
+              <button class="stg" id="searchCase" aria-label="Match case" data-tip="Match Case">Aa</button>
+              <button class="stg" id="searchWord" aria-label="Match whole word" data-tip="Match Whole Word">ab</button>
+              <button class="stg" id="searchRegex" aria-label="Use regular expression" data-tip="Use Regular Expression">.*</button>
+            </div>
+          </div>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+        <div class="search-footer" id="searchFooter"></div>
+      </div>
+
+      <div class="sidebar__view" id="view-scm">
+        <div class="scm">
+          <div class="scm__head">
+            <span class="sidebar__title" id="scmTitle">Source Control</span>
+            <button class="sbtn" id="scmSyncBtn" aria-label="Synchronize changes" data-tip="Sync"><span data-icon="sync"></span></button>
+          </div>
+          <div class="scm__input-wrap">
+            <textarea id="scmCommitInput" rows="2" placeholder="Message (Ctrl+Enter to commit)" spellcheck="false"></textarea>
+          </div>
+          <button class="btn btn--accent btn--block" id="scmCommitBtn" disabled>Commit</button>
+          <div class="scm__changes-head">CHANGES <span class="count-badge" id="scmCount">3</span></div>
+          <div class="scm__list" id="scmList"></div>
+        </div>
+      </div>
+
+      <div class="sidebar__view" id="view-debug">
+        <div class="sideview-empty">
+          <span data-icon="debug"></span>
+          <p>Run and Debug</p>
+          <p class="sideview-empty__sub">To customize Run and Debug, <button class="linkbtn" id="debugLaunchLink">create a launch.json file</button>.</p>
+        </div>
+      </div>
+
+      <div class="sidebar__view" id="view-extensions">
+        <div class="sideview-empty">
+          <span data-icon="extensions"></span>
+          <p>Extensions</p>
+          <p class="sideview-empty__sub">No extensions installed in this workspace yet.</p>
+        </div>
+      </div>
+    </aside>
+
+    <div class="handle handle--col" id="sidebarResize" role="separator" aria-label="Resize sidebar"></div>
+
+    <!-- Editor column -->
+    <div class="editor-col" id="editorCol">
+      <div class="tabstrip" id="tabstrip" role="tablist"></div>
+      <div class="breadcrumbs" id="breadcrumbs"></div>
+
+      <div class="code-wrap" id="codeWrap">
+        <div class="code-scroll" id="codeScroll">
+          <div class="code-lines" id="codeLines"></div>
+        </div>
+        <div class="diff-view" id="diffView" hidden>
+          <div class="diff-view__head" id="diffHead"></div>
+          <div class="diff-view__body" id="diffBody"></div>
+        </div>
+        <div class="welcome" id="welcomeView" hidden>
+          <div class="welcome__inner">
+            <div class="welcome__logo" aria-hidden="true">
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none">
+                <rect x="1.5" y="1.5" width="21" height="21" rx="6" fill="url(#lg2)"/>
+                <path d="M8.8 7.4v9.2M15.2 7.4v9.2M8.8 12h6.4" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
+                <defs><linearGradient id="lg2" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#9d7bff"/><stop offset="1" stop-color="#6a48f2"/></linearGradient></defs>
+              </svg>
+            </div>
+            <h1 class="welcome__title">agrosmart-dashboard</h1>
+            <p class="welcome__sub">Farm telemetry, distilled. React 19 · TypeScript · Vite</p>
+            <div class="welcome__shortcuts">
+              <button class="wshort" data-action="file"><span>Open File…</span><kbd>Alt+P</kbd></button>
+              <button class="wshort" data-action="search"><span>Search Everywhere</span><kbd>Ctrl+K</kbd></button>
+              <button class="wshort" data-action="terminal"><span>Toggle Terminal</span><kbd>Alt+J</kbd></button>
+            </div>
+            <button class="welcome__agent" id="welcomeAgentCard">
+              <span class="welcome__agent-icon" data-icon="sparkle"></span>
+              <span class="welcome__agent-text"><strong>Ask the Agent</strong><em>Delegate a task — read, edit, run — while you keep coding</em></span>
+              <span class="welcome__agent-arrow" data-icon="chevron"></span>
+            </button>
+          </div>
+        </div>
+        <div class="minimap" id="minimap" aria-hidden="true">
+          <canvas id="minimapCanvas"></canvas>
+          <div class="minimap__vp" id="minimapVp"></div>
+        </div>
+      </div>
+
+      <div class="handle handle--row" id="panelResize" role="separator" aria-label="Resize panel"></div>
+
+      <!-- Bottom panel -->
+      <div class="panel" id="bottomPanel">
+        <div class="panel__head">
+          <div class="ptabs" role="tablist">
+            <button class="ptab" data-panel="problems" role="tab">PROBLEMS <span class="ptab__badge" id="problemsBadge">0</span></button>
+            <button class="ptab" data-panel="output" role="tab">OUTPUT</button>
+            <button class="ptab" data-panel="debug" role="tab">DEBUG CONSOLE</button>
+            <button class="ptab ptab--active" data-panel="terminal" role="tab">TERMINAL</button>
+            <button class="ptab" data-panel="ports" role="tab">PORTS</button>
+          </div>
+          <div class="panel__actions">
+            <button class="sbtn" id="panelSplitBtn" aria-label="Split terminal" data-tip="Split Terminal"><span data-icon="split"></span></button>
+            <button class="sbtn" id="panelKillBtn" aria-label="Kill terminal" data-tip="Kill Terminal"><span data-icon="trash"></span></button>
+            <button class="sbtn" id="panelCollapseBtn" aria-label="Collapse panel" data-tip="Collapse Panel"><span data-icon="chevronDown"></span></button>
+          </div>
+        </div>
+        <div class="panel__body">
+          <div class="pview" id="pview-problems" hidden></div>
+          <div class="pview pview--output" id="pview-output" hidden></div>
+          <div class="pview" id="pview-debug" hidden></div>
+          <div class="pview pview--term" id="pview-terminal">
+            <div class="term__tabs">
+              <div class="term__tablist" id="termTablist"></div>
+              <div class="term__tabs-actions">
+                <button class="sbtn" id="termAddBtn" aria-label="New terminal" data-tip="New Terminal"><span data-icon="plus"></span></button>
+                <button class="sbtn" id="termTrashBtn" aria-label="Delete terminal" data-tip="Delete Terminal"><span data-icon="trash"></span></button>
+              </div>
+            </div>
+            <div class="term__body" id="termBody" tabindex="0">
+              <div class="term__lines" id="termLines"></div>
+              <div class="term__prompt-line" id="termPromptLine">
+                <span class="term__arrow">➜</span><span class="term__cwd">agrosmart-dashboard</span>
+                <span class="term__input-mirror" id="termMirror"></span><span class="term__cursor" id="termCursor"></span>
+              </div>
+            </div>
+            <input id="termInput" class="term__hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal input">
+          </div>
+          <div class="pview" id="pview-ports" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="handle handle--col" id="agentResize" role="separator" aria-label="Resize agent panel"></div>
+
+    <!-- Agent panel -->
+    <aside class="agent" id="agentPanel" aria-label="Agent chat">
+      <div class="agent__head">
+        <div class="agent__head-titles">
+          <h2>Agent</h2><span class="agent__session" id="agentSessionName">Session 12:47</span>
+        </div>
+        <div class="agent__head-actions">
+          <button class="sbtn" id="agentHistoryBtn" aria-label="Session history" data-tip="History"><span data-icon="history"></span></button>
+          <button class="sbtn" id="agentNewChatBtn" aria-label="New chat" data-tip="New Chat"><span data-icon="plus"></span></button>
+          <button class="sbtn" id="agentCloseBtn" aria-label="Close agent panel" data-tip="Close"><span data-icon="close"></span></button>
+        </div>
+      </div>
+      <div class="agent__stream" id="agentStream">
+        <div class="agent__empty" id="agentEmpty">
+          <div class="agent__empty-mark" data-icon="sparkleLarge"></div>
+          <h3 class="agent__empty-title">Hi Vincent, I&rsquo;m your coding agent</h3>
+          <p class="agent__empty-credit">Built by IRAGUHA Vincent</p>
+          <div class="agent__suggestions" id="agentSuggestions"></div>
+        </div>
+      </div>
+      <button class="agent__jump" id="agentJump" hidden>↓ Jump to latest</button>
+      <div class="agent__composer">
+        <div class="ctx-chips" id="ctxChips"></div>
+        <textarea id="agentInput" rows="1" placeholder="Ask anything, or describe a task… (@ to mention files)" spellcheck="false" aria-label="Message the agent"></textarea>
+        <div class="composer__row">
+          <div class="mode-pills" role="tablist" aria-label="Agent mode">
+            <button class="mpill" data-mode="ask" role="tab">Ask</button>
+            <button class="mpill mpill--active" data-mode="agent" role="tab">Agent</button>
+            <button class="mpill" data-mode="plan" role="tab">Plan</button>
+          </div>
+          <div class="composer__right">
+            <button class="model-picker" id="modelBtn" aria-haspopup="menu"><span id="modelName">HugMoss Max</span><span class="model-picker__chev" data-icon="chevronDown"></span></button>
+            <button class="send-btn" id="sendBtn" aria-label="Send message" disabled><span data-icon="send"></span></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ======================= STATUS BAR ======================= -->
+  <footer class="statusbar">
+    <div class="statusbar__left">
+      <button class="sb-item sb-item--accent" id="sbBranch" aria-label="Source control branch">
+        <span data-icon="branch"></span><span id="sbBranchName">main</span><span class="sb-sync" data-icon="sync"></span>
+      </button>
+      <button class="sb-item" id="sbProblems" aria-label="Problems"><span class="sb-ico sb-ico--err" data-icon="errorCircle"></span><span id="sbErrCount">0</span><span class="sb-ico sb-ico--warn" data-icon="warning"></span><span id="sbWarnCount">0</span></button>
+    </div>
+    <div class="statusbar__right">
+      <button class="sb-item" id="sbCursor">Ln 24, Col 8</button>
+      <button class="sb-item" id="sbIndent">Spaces: 2</button>
+      <button class="sb-item" id="sbEncoding">UTF-8</button>
+      <button class="sb-item" id="sbEol">LF</button>
+      <button class="sb-item" id="sbLang">TypeScript React</button>
+      <button class="sb-item" id="sbPrettier" aria-label="Prettier is enabled"><span data-icon="check"></span></button>
+      <button class="sb-item" id="sbBell" aria-label="Notifications"><span data-icon="bell"></span></button>
+    </div>
+  </footer>
+</div>
+
+<!-- ======================= OVERLAYS ======================= -->
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="overlay" id="paletteOverlay" hidden>
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette__input-wrap">
+      <span class="palette__icon" data-icon="search"></span>
+      <input id="paletteInput" placeholder="Type a command…" autocomplete="off" spellcheck="false" aria-label="Command or file search">
+      <kbd>esc</kbd>
+    </div>
+    <div class="palette__list" id="paletteList" role="listbox"></div>
+    <div class="palette__footer">↑↓ navigate · ↵ select · esc dismiss</div>
+  </div>
+</div>
+
+<div class="overlay overlay--dim" id="settingsOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal__head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button class="sbtn" id="settingsClose" aria-label="Close settings"><span data-icon="close"></span></button>
+    </div>
+    <div class="modal__body">
+      <section class="settings-section">
+        <h3>Appearance</h3>
+        <div class="theme-cards" role="radiogroup" aria-label="Theme">
+          <button class="theme-card theme-card--active" data-theme-choice="dark" role="radio" aria-checked="true">
+            <span class="theme-card__preview theme-card__preview--dark"><i></i><i></i><i></i></span>
+            <span>Dark</span><span class="theme-card__check" data-icon="check"></span>
+          </button>
+          <button class="theme-card" data-theme-choice="light" role="radio" aria-checked="false">
+            <span class="theme-card__preview theme-card__preview--light"><i></i><i></i><i></i></span>
+            <span>Light</span><span class="theme-card__check" data-icon="check"></span>
+          </button>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3>Editor</h3>
+        <div class="settings-row">
+          <label for="fontSizeRange">Font size</label>
+          <div class="settings-row__ctrl">
+            <input type="range" id="fontSizeRange" min="12" max="16" step="1" value="13" aria-label="Editor font size">
+            <span class="settings-value" id="fontSizeValue">13px</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label for="wrapToggle">Word wrap</label>
+          <button class="switch" id="wrapToggle" role="switch" aria-checked="false" aria-labelledby="wrapLabel"><span class="switch__knob"></span></button>
+          <span class="sr-only" id="wrapLabel">Word wrap</span>
+        </div>
+        <div class="settings-row">
+          <label for="minimapToggle">Minimap</label>
+          <button class="switch switch--on" id="minimapToggle" role="switch" aria-checked="true" aria-labelledby="mmLabel"><span class="switch__knob"></span></button>
+          <span class="sr-only" id="mmLabel">Minimap</span>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3>Agent</h3>
+        <div class="settings-row">
+          <label for="agentModeSelect">Default mode</label>
+          <select id="agentModeSelect">
+            <option value="ask">Ask</option>
+            <option value="agent" selected>Agent</option>
+            <option value="plan">Plan</option>
+          </select>
+        </div>
+      </section>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--accent" id="settingsDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="notif-popover" id="notifPopover" hidden></div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/workspace.js"></script>
+<script src="assets/js/highlight.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/terminal.js"></script>
+<script src="assets/js/agent.js"></script>
+</body>
+</html>
