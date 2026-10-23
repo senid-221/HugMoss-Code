@@ -763,8 +763,19 @@
     renderList();
     panel.appendChild(pop);
     var pr = panel.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
-    pop.style.left = Math.max(8, Math.min(ar.left - pr.left - 120, pr.width - 350)) + "px";
-    pop.style.bottom = (pr.bottom - ar.top + 6) + "px";
+    var margin = 10;
+    var width = pop.offsetWidth;
+    var left = ar.left - pr.left + ar.width / 2 - width / 2;
+    left = Math.max(margin, Math.min(left, pr.width - width - margin));
+    var avail = Math.max(160, Math.min(ar.top - pr.top - 54, window.innerHeight - 24));
+    pop.style.left = Math.round(left) + "px";
+    pop.style.bottom = Math.round(pr.bottom - ar.top + 6) + "px";
+    pop.style.maxHeight = Math.round(avail) + "px";
+    var head = pop.querySelector(".model-pop__head");
+    var foot = pop.querySelector(".model-pop__foot");
+    var chrome = (head ? head.offsetHeight : 0) + (foot ? foot.offsetHeight : 0);
+    var list = pop.querySelector("#modelList");
+    if (list) list.style.maxHeight = Math.round(Math.max(120, avail - chrome - 10)) + "px";
     setTimeout(function () { var s = $("#modelSearch", pop); if (s) s.focus(); }, 30);
 
     Providers.available().forEach(function (p) {
