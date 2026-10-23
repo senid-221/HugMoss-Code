@@ -3,7 +3,12 @@
   "use strict";
 
   function esc(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   var KW = "abstract|any|as|asserts|async|await|boolean|break|case|catch|class|const|continue|debugger|declare|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|implements|import|in|infer|instanceof|interface|is|keyof|let|namespace|never|new|null|number|object|of|override|private|protected|public|readonly|return|satisfies|set|static|string|super|switch|this|throw|true|try|type|typeof|undefined|unknown|var|void|while|yield";
@@ -135,9 +140,10 @@
 
   /* unified line diff via LCS; returns [{type: ctx|add|del, a, b, text}] */
   function diffLines(aText, bText) {
-    var a = aText ? aText.split("\n") : [];
-    var b = bText ? bText.split("\n") : [];
+    var a = aText ? aText.replace(/\r\n/g, "\n").split("\n") : [];
+    var b = bText ? bText.replace(/\r\n/g, "\n").split("\n") : [];
     var n = a.length, m = b.length;
+    if (n * m > 2000000) return coarseDiff(a, b);
     var dp = [];
     for (var i = 0; i <= n; i++) dp.push(new Array(m + 1).fill(0));
     for (i = n - 1; i >= 0; i--) {
@@ -161,6 +167,25 @@
     }
     while (ai < n) out.push({ type: "del", a: ++la, b: null, text: a[ai++] });
     while (bj < m) out.push({ type: "add", a: null, b: ++lb, text: b[bj++] });
+    return out;
+  }
+
+  /* whole-file diffs get expensive past a few thousand lines: keep the common
+     prefix and suffix and treat the middle as one replaced block. */
+  function coarseDiff(a, b) {
+    var prefix = 0;
+    while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+    var suffix = 0;
+    while (suffix < a.length - prefix && suffix < b.length - prefix &&
+      a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix++;
+    var out = [];
+    var i;
+    for (i = 0; i < prefix; i++) out.push({ type: "ctx", a: i + 1, b: i + 1, text: a[i] });
+    for (i = prefix; i < a.length - suffix; i++) out.push({ type: "del", a: i + 1, b: null, text: a[i] });
+    for (i = prefix; i < b.length - suffix; i++) out.push({ type: "add", a: null, b: i + 1, text: b[i] });
+    for (i = a.length - suffix; i < a.length; i++) {
+      out.push({ type: "ctx", a: i + 1, b: b.length - (a.length - i) + 1, text: a[i] });
+    }
     return out;
   }
 

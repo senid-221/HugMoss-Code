@@ -1,47 +1,42 @@
-/* terminal.js — simulated shell operating on the virtual workspace. */
+/* terminal.js — a file shell over the real workspace. No process host exists in a browser tab. */
 (function () {
   "use strict";
 
   var $ = function (sel) { return document.querySelector(sel); };
+  var esc = function (s) { return HL.esc(s); };
 
   var sessions = [];
   var current = 0;
   var buffer = "";
   var history = [];
   var histIdx = -1;
-  var streamLock = false;
 
-  var COMMITS = [
-    ["7f3a1c9", "feat: dashboard grid + stats cards"],
-    ["b21e80d", "fix: clamp humidity reading to 0-100"],
-    ["4c9f772", "refactor: extract api client with timeout"],
-    ["1ad5530", "chore: scaffold Vite + TypeScript"],
-    ["0e6b218", "initial commit"]
-  ];
-
-  function esc(s) { return HL.esc(s); }
-  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function s() { return sessions[current]; }
+  function promptPath() {
+    var cwd = s().cwd;
+    return "~" + (cwd ? "/" + cwd : "");
+  }
 
   /* ----------------------------- session model ------------------------- */
   function newSession(silent) {
-    sessions.push({ lines: [], label: "pwsh — agrosmart", id: sessions.length + 1 });
+    sessions.push({ lines: [], label: "shell " + (sessions.length + 1), cwd: "" });
     current = sessions.length - 1;
     push(banner());
     renderTabs();
+    renderPrompt();
     if (!silent) focus();
   }
+
   function banner() {
-    return '<div class="tline tline--dim">HugMoss integrated terminal · <span class="c-accent">pwsh</span> · node 22.11.0 · ' +
-      esc(WS.projectName) + "</div>";
+    return '<div class="tline tline--dim">HugMoss file shell · <span class="c-accent">no process host</span> · ' +
+      (WS.loaded ? esc(WS.projectName) + " · " + WS.visiblePaths().length + " files" : "open a folder to browse files") + "</div>" +
+      '<div class="tline tline--dim">Type <span class="c-cyan">help</span> for commands. Nothing here executes programs.</div>';
   }
-  function s() { return sessions[current]; }
 
   function push(html) {
     s().lines.push(html);
-    if (s() === sessions[current]) {
-      $("#termLines").insertAdjacentHTML("beforeend", html);
-      scrollDown();
-    }
+    $("#termLines").insertAdjacentHTML("beforeend", html);
+    scrollDown();
   }
   function scrollDown() {
     var body = $("#termBody");
@@ -60,297 +55,349 @@
     });
   }
   function switchTo(i) {
+    if (!sessions[i]) return;
     current = i;
     $("#termLines").innerHTML = s().lines.join("");
     renderTabs();
+    renderPrompt();
     scrollDown();
     focus();
   }
+  function renderPrompt() {
+    var cwd = $("#termCwd");
+    if (cwd) cwd.textContent = promptPath();
+  }
 
-  /* -------------------------------- prompt ----------------------------- */
-  function promptHtml(cmd) {
-    return '<div class="tline"><span class="term__arrow">➜</span> <span class="term__cwd">agrosmart-dashboard</span>' +
-      (cmd ? ' <span class="c-dim">' + esc(cmd) + "</span>" : "") + "</div>";
+  /* ------------------------------- paths ------------------------------- */
+  function isDir(path) {
+    if (!path) return WS.loaded;
+    var prefix = path + "/";
+    return WS.visiblePaths().some(function (p) { return p.indexOf(prefix) === 0; });
   }
-  function echoCommand(cmd) {
-    push(promptHtml(cmd));
+  function isFile(path) { return !!WS.record(path) && !WS.record(path).deleted; }
+  function resolve(raw) {
+    var value = String(raw || "").replace(/\\/g, "/");
+    if (!value || value === "~") return s().cwd;
+    if (value.indexOf("~/") === 0) value = value.slice(2);
+    else if (value.charAt(0) === "/") value = value.slice(1);
+    else value = (s().cwd ? s().cwd + "/" : "") + value;
+    return WS.normalize(value);
   }
+  function children(dir) {
+    var prefix = dir ? dir + "/" : "";
+    var dirs = {}, files = [];
+    WS.visiblePaths().forEach(function (p) {
+      if (p.indexOf(prefix) !== 0) return;
+      var rest = p.slice(prefix.length);
+      if (!rest) return;
+      var slash = rest.indexOf("/");
+      if (slash >= 0) dirs[rest.slice(0, slash)] = 1;
+      else files.push(rest);
+    });
+    return { dirs: Object.keys(dirs).sort(), files: files.sort() };
+  }
+  function requireWorkspace() {
+    if (!WS.loaded) {
+      out('<span class="c-red">No folder is open.</span> <span class="c-dim">Use File ▸ Open Folder, or drop a folder on the window.</span>');
+      return false;
+    }
+    return true;
+  }
+  function syntaxLine(path, line) { return HL.renderLine(line, WS.language(path)) || "&nbsp;"; }
 
   /* ------------------------------- commands ---------------------------- */
-  var cmds = {
-    help: function () {
-      out('<span class="c-bold">Available commands</span>');
-      out('  <span class="c-cyan">ls</span> [dir]        list workspace files');
-      out('  <span class="c-cyan">cat</span> &lt;file&gt;      print a file with syntax colour');
-      out('  <span class="c-cyan">find</span> &lt;term&gt;     search file names and contents');
-      out('  <span class="c-cyan">clear</span>          clear this terminal');
-      out('  <span class="c-cyan">pwd</span> · <span class="c-cyan">whoami</span> · <span class="c-cyan">date</span> · <span class="c-cyan">echo</span>');
-      out('  <span class="c-cyan">git status</span> · <span class="c-cyan">git log</span> · <span class="c-cyan">git diff</span> · <span class="c-cyan">git add .</span> · <span class="c-cyan">git commit -m "…"</span>');
-      out('  <span class="c-cyan">npm run dev</span> · <span class="c-cyan">npm run build</span> · <span class="c-cyan">npm test</span> · <span class="c-cyan">npm install</span>');
-      out('  <span class="c-dim">↑ / ↓ walk history · Ctrl+C aborts · Ctrl+L clears</span>');
-    },
-    ls: function (args) {
-      var dir = args[0];
-      var paths = WS.visiblePaths();
-      if (dir) {
-        var clean = dir.replace(/\/+$/, "").replace(/^\.\//, "");
-        var hits = paths.filter(function (p) { return p.indexOf(clean + "/") === 0; })
-          .map(function (p) { return p.slice(clean.length + 1); })
-          .filter(function (p) { return p.indexOf("/") < 0; });
-        if (!hits.length) return out('<span class="c-red">ls: ' + esc(dir) + ": No such file or directory</span>");
-        return hits.forEach(function (h) { out("  " + esc(h)); });
+  var cmds = {};
+
+  cmds.help = function () {
+    out('<span class="c-bold">HugMoss file shell</span> <span class="c-dim">— reads the open folder, never spawns a process</span>');
+    out("");
+    out('  <span class="c-cyan">ls</span> [dir]        list a directory');
+    out('  <span class="c-cyan">cd</span> &lt;dir&gt;        change directory (use <span class="c-cyan">cd ~</span> for root)');
+    out('  <span class="c-cyan">pwd</span>             print the current folder');
+    out('  <span class="c-cyan">cat</span> &lt;file&gt;      print a file with syntax colour');
+    out('  <span class="c-cyan">head</span> &lt;file&gt; [n]  first lines · <span class="c-cyan">tail</span> for the last');
+    out('  <span class="c-cyan">wc</span> &lt;file&gt;       line, word and character counts');
+    out('  <span class="c-cyan">find</span> &lt;text&gt;     search names and contents');
+    out('  <span class="c-cyan">tree</span> [dir]      show the folder as a tree');
+    out('  <span class="c-cyan">open</span> &lt;file&gt;     open the file in the editor');
+    out('  <span class="c-cyan">download</span> &lt;file&gt; save a copy through the browser');
+    out('  <span class="c-cyan">history</span> · <span class="c-cyan">clear</span> · <span class="c-cyan">date</span> · <span class="c-cyan">echo</span>');
+    out("");
+    out('<span class="c-dim">There is no git, npm, node or shell execution in this browser tab. Use Changes for session diffs and your own terminal for builds.</span>');
+  };
+
+  cmds.pwd = function () { out("/" + (s().cwd ? s().cwd : "") + (s().cwd ? "" : "")); };
+
+  cmds.cd = function (args) {
+    var target = resolve(args[0] || "~");
+    if (!isDir(target)) {
+      out('<span class="c-red">cd: ' + esc(args[0] || "") + ": Not a directory</span>");
+      return;
+    }
+    s().cwd = target;
+    renderPrompt();
+    out('<span class="c-dim">' + esc(promptPath()) + "</span>");
+  };
+
+  cmds.ls = function (args) {
+    if (!requireWorkspace()) return;
+    var target = resolve(args[0] || ".");
+    if (isFile(target)) { out(esc(target)); return; }
+    if (!isDir(target)) { out('<span class="c-red">ls: ' + esc(args[0]) + ": No such directory</span>"); return; }
+    var node = children(target);
+    if (!node.dirs.length && !node.files.length) { out('<span class="c-dim">(empty)</span>'); return; }
+    node.dirs.forEach(function (d) { out('<span class="c-blue">' + esc(d) + "/</span>"); });
+    node.files.forEach(function (f) {
+      var rec = WS.record((target ? target + "/" : "") + f);
+      var suffix = rec && rec.secret ? ' <span class="c-yellow">[secret]</span>' : "";
+      out("  " + esc(f) + suffix);
+    });
+  };
+
+  cmds.cat = function (args) {
+    if (!requireWorkspace()) return;
+    if (!args[0]) { out('<span class="c-red">usage: cat &lt;file&gt;</span>'); return; }
+    var path = resolve(args[0]);
+    if (!isFile(path)) { out('<span class="c-red">cat: ' + esc(args[0]) + ": No such file</span>"); return; }
+    var lines = (WS.content(path) || "").split("\n");
+    var limit = Math.min(lines.length, 2000);
+    for (var i = 0; i < limit; i++) out("  " + syntaxLine(path, lines[i]));
+    if (lines.length > limit) out('<span class="c-dim">… ' + (lines.length - limit) + " more lines</span>");
+  };
+
+  cmds.head = function (args) {
+    if (!requireWorkspace()) return;
+    var path = resolve(args[0] || "");
+    if (!args[0] || !isFile(path)) { out('<span class="c-red">usage: head &lt;file&gt; [lines]</span>'); return; }
+    var count = Math.max(1, Math.min(200, parseInt(args[1], 10) || 20));
+    (WS.content(path) || "").split("\n").slice(0, count).forEach(function (ln) { out("  " + syntaxLine(path, ln)); });
+  };
+
+  cmds.tail = function (args) {
+    if (!requireWorkspace()) return;
+    var path = resolve(args[0] || "");
+    if (!args[0] || !isFile(path)) { out('<span class="c-red">usage: tail &lt;file&gt; [lines]</span>'); return; }
+    var count = Math.max(1, Math.min(200, parseInt(args[1], 10) || 20));
+    var all = (WS.content(path) || "").split("\n");
+    all.slice(Math.max(0, all.length - count)).forEach(function (ln) { out("  " + syntaxLine(path, ln)); });
+  };
+
+  cmds.wc = function (args) {
+    if (!requireWorkspace()) return;
+    var path = resolve(args[0] || "");
+    if (!args[0] || !isFile(path)) { out('<span class="c-red">usage: wc &lt;file&gt;</span>'); return; }
+    var text = WS.content(path) || "";
+    out("  " + text.split("\n").length + " lines · " + (text.trim() ? text.trim().split(/\s+/).length : 0) + " words · " + text.length + " characters");
+  };
+
+  cmds.find = function (args) {
+    if (!requireWorkspace()) return;
+    var term = (args[0] || "").toLowerCase();
+    if (!term) { out('<span class="c-red">usage: find &lt;text&gt;</span>'); return; }
+    var count = 0;
+    WS.visiblePaths().forEach(function (path) {
+      var rec = WS.record(path);
+      if (!rec || rec.secret) return;
+      if (path.toLowerCase().indexOf(term) >= 0 && count < 80) {
+        out('  <span class="c-green">' + esc(path) + "</span>");
+        count++;
       }
-      var root = WS.buildTree();
-      root.dirs.forEach(function (d) { out('  <span class="c-blue">' + esc(d.name) + "/</span>"); });
-      root.files.forEach(function (f) { out("  " + esc(f.name)); });
-    },
-    cat: function (args) {
-      var path = args[0];
-      if (!path) return out('<span class="c-red">usage: cat &lt;file&gt;</span>');
-      var clean = path.replace(/^\.\//, "");
-      if (!WS.files[clean]) return out('<span class="c-red">cat: ' + esc(path) + ": No such file</span>");
-      (WS.content(clean) || "").split("\n").forEach(function (ln) {
-        out("  " + (HL.renderLine(ln, WS.language(clean)) || "&nbsp;"));
+      if (count >= 80) return;
+      var lines = rec.content.split("\n");
+      for (var i = 0; i < lines.length && count < 80; i++) {
+        if (lines[i].toLowerCase().indexOf(term) >= 0) {
+          out("  <span class=\"" + "c-accent" + "\">" + esc(path) + ":" + (i + 1) + "</span> <span class=\"c-dim\">" + esc(lines[i].trim().slice(0, 100)) + "</span>");
+          count++;
+        }
+      }
+    });
+    if (!count) out('<span class="c-dim">no matches for “' + esc(term) + "”</span>");
+  };
+
+  cmds.tree = function (args) {
+    if (!requireWorkspace()) return;
+    var root = resolve(args[0] || ".");
+    if (!isDir(root)) { out('<span class="c-red">tree: ' + esc(args[0]) + ": No such directory</span>"); return; }
+    out('<span class="c-blue">' + esc(promptPath() === "~" && !root ? WS.projectName : (root ? root + "/" : WS.projectName)) + "</span>");
+    (function walk(dir, prefix, depth) {
+      if (depth > 6) return;
+      var node = children(dir);
+      var total = node.dirs.length + node.files.length;
+      var index = 0;
+      node.dirs.forEach(function (d) {
+        index++;
+        var last = index === total;
+        out('<span class="c-dim">' + prefix + (last ? "└── " : "├── ") + "</span><span class=\"c-blue\">" + esc(d) + "/</span>");
+        walk((dir ? dir + "/" : "") + d, prefix + (last ? "    " : "│   "), depth + 1);
       });
-    },
-    find: function (args) {
-      var term = (args[0] || "").toLowerCase();
-      if (!term) return out('<span class="c-red">usage: find &lt;term&gt;</span>');
-      var n = 0;
-      WS.visiblePaths().forEach(function (p) {
-        if (p.toLowerCase().indexOf(term) >= 0) { out('  <span class="c-green">' + esc(p) + "</span>"); n++; return; }
-        (WS.content(p) || "").split("\n").forEach(function (ln, i) {
-          if (ln.toLowerCase().indexOf(term) >= 0 && n < 40) { out("  " + esc(p) + ":" + (i + 1) + ": <span class=\"c-dim\">" + esc(ln.trim().slice(0, 70)) + "</span>"); n++; }
-        });
+      node.files.forEach(function (f) {
+        index++;
+        var last = index === total;
+        out('<span class="c-dim">' + prefix + (last ? "└── " : "├── ") + "</span>" + esc(f));
       });
-      if (!n) out("  <span class=\"c-dim\">no matches for “" + esc(term) + "”</span>");
-    },
-    clear: function () { s().lines = []; $("#termLines").innerHTML = ""; },
-    pwd: function () { out("/home/vincent/projects/agrosmart-dashboard"); },
-    whoami: function () { out("vincent"); },
-    date: function () { out(new Date().toString()); },
-    echo: function (args) { out(esc(args.join(" "))); },
-    node: function (args) {
-      if (args[0] === "-v" || args[0] === "--version") return out("v22.11.0");
-      out('<span class="c-dim">node REPL is not wired in this preview</span>');
-    },
-    git: function (args) {
-      var sub = args[0];
-      if (sub === "status") {
-        out("On branch <span class='c-accent'>main</span>");
-        out("Your branch is up to date with '<span class='c-accent'>origin/main</span>'.");
-        out("");
-        var list = App.state.scm;
-        if (!list.length) return out("nothing to commit, working tree clean");
-        out('<span class="c-bold">Changes not staged for commit:</span>');
-        list.forEach(function (c) {
-          var isNew = c.kind === "U" || c.kind === "A";
-          var tag = isNew ? "new file:   " : "modified:   ";
-          out('  <span class="' + (isNew ? "c-green" : "c-yellow") + '">' + tag + esc(c.path) + "</span>");
-        });
-        out("");
-        out("no changes added to commit — <span class='c-cyan'>git add .</span> then <span class='c-cyan'>git commit -m \"…\"</span>");
-        return;
-      }
-      if (sub === "log" || sub === "l") {
-        COMMITS.forEach(function (c) {
-          out('<span class="c-accent">commit ' + c[0] + '</span> <span class="c-dim">(HEAD -&gt; main, origin/main)</span>');
-          out('  <span class="c-bold">IRAGUHA Vincent</span> &lt;vincent@agrosmart.dev&gt;');
-          out("  " + esc(c[1]));
-          out("");
-        });
-        return;
-      }
-      if (sub === "diff") {
-        var list2 = App.state.scm.filter(function (c) { return c.kind !== "U" && c.kind !== "A"; });
-        if (!list2.length) return out('<span class="c-dim">(no unstaged differences)</span>');
-        list2.forEach(function (c) {
-          var lines = HL.diffLines(WS.head(c.path) || "", WS.content(c.path) || "");
-          var adds = lines.filter(function (l) { return l.type === "add"; }).length;
-          var dels = lines.filter(function (l) { return l.type === "del"; }).length;
-          out('<span class="c-bold">diff --git a/' + esc(c.path) + " b/" + esc(c.path) + "</span>");
-          out('<span class="c-dim">@@ -1,' + adds + dels + " +1," + adds + dels + ' @@</span>');
-          lines.forEach(function (l) {
-            if (l.type === "ctx") return out('  <span class="c-dim">' + esc(l.text.slice(0, 90)) + "</span>");
-            var sign = l.type === "add" ? "+" : "-";
-            var cls = l.type === "add" ? "c-green" : "c-red";
-            out('<span class="' + cls + '">' + sign + " " + esc(l.text.slice(0, 90)) + "</span>");
-          });
-        });
-        return;
-      }
-      if (sub === "add") {
-        out('<span class="c-dim">staged ' + App.state.scm.length + " file(s)</span>");
-        return;
-      }
-      if (sub === "commit") {
-        var msg = args.slice(1).join(" ").replace(/^["']|["']$/g, "");
-        if (!msg) return out('<span class="c-red">aborting: empty commit message</span>');
-        var n = App.state.scm.length;
-        App.state.scm = [];
-        App.treeRefresh();
-        out('<span class="c-green">[main ' + Math.random().toString(16).slice(2, 9) + "] " + esc(msg) + "</span>");
-        out(" " + n + " file" + (n === 1 ? "" : "s") + " changed");
-        return;
-      }
-      if (sub === "branch") return out("* <span class='c-accent'>main</span>\n  feature/alert-badges");
-      out('<span class="c-red">git: "' + esc(sub || "") + '" is not a git command. See "git help".</span>');
-    },
-    npm: function (args) {
-      var j = args.join(" ");
-      if (/^run\s+dev$|^start$/.test(j)) return devServer();
-      if (/^run\s+build$|^build$/.test(j)) return build();
-      if (/^test$|^run\s+test$|^t$/.test(j)) return test();
-      if (/^install$|^i$/.test(j)) return install();
-      if (/^run\s+lint$|^lint$/.test(j)) return lint();
-      out('<span class="c-red">npm error</span> no script for "' + esc(j) + '"');
+    })(root, "", 0);
+  };
+
+  cmds.open = function (args) {
+    if (!requireWorkspace()) return;
+    var path = resolve(args[0] || "");
+    if (!args[0] || !isFile(path)) { out('<span class="c-red">usage: open &lt;file&gt;</span>'); return; }
+    if (window.App) App.openFile(path, { focus: true });
+    out('<span class="c-dim">opened ' + esc(path) + "</span>");
+  };
+
+  cmds.download = function (args) {
+    if (!requireWorkspace()) return;
+    var path = resolve(args[0] || "");
+    if (!args[0] || !isFile(path)) { out('<span class="c-red">usage: download &lt;file&gt;</span>'); return; }
+    if (window.App) App.downloadPath(path);
+    out('<span class="c-dim">downloaded a copy of ' + esc(path) + "</span>");
+  };
+
+  cmds.clear = function () {
+    s().lines = [];
+    $("#termLines").innerHTML = "";
+  };
+
+  cmds.history = function () {
+    if (!history.length) { out('<span class="c-dim">No commands yet.</span>'); return; }
+    history.slice(-30).forEach(function (h, i) { out('<span class="c-dim">' + (history.length - Math.min(30, history.length) + i + 1) + "  " + esc(h) + "</span>"); });
+  };
+
+  cmds.date = function () { out(esc(new Date().toString())); };
+  cmds.echo = function (args) { out(esc(args.join(" "))); };
+
+  cmds.git = function () {
+    out('<span class="c-yellow">No git process runs in this browser tab.</span>');
+    out('<span class="c-dim">HugMoss tracks session edits in Changes (Alt+Z) and can revert them. Commit with your own git client.</span>');
+    var changes = WS.loaded ? WS.changes() : [];
+    if (changes.length) {
+      out("");
+      out('<span class="c-bold">Session changes</span> <span class="c-dim">(not a git status)</span>');
+      changes.forEach(function (c) {
+        out('  <span class="c-' + (c.kind === "D" ? "red" : c.kind === "U" ? "green" : "yellow") + '">' + c.kind + "  " + esc(c.path) + "</span>");
+      });
     }
   };
 
-  function stream(lines, done) {
-    streamLock = true;
-    var i = 0;
-    (function step() {
-      if (i >= lines.length) { streamLock = false; if (done) done(); return; }
-      out(lines[i++]);
-      setTimeout(step, lines[i - 1] && lines[i - 1].indexOf("▏") >= 0 ? 26 : 95);
-    })();
-  }
-  function devServer() {
-    stream([
-      '<span class="c-dim">&gt; agrosmart-dashboard@0.4.0 dev</span>',
-      '<span class="c-dim">&gt; vite</span>',
-      "",
-      '  <span class="c-green">VITE</span> v6.0.3  <span class="c-bold">ready in 412 ms</span>',
-      "",
-      '  <span class="c-bold">➜  Local:</span>   <span class="c-cyan">http://localhost:5173/</span>',
-      '  <span class="c-bold">➜  Network:</span> use <span class="c-dim">--host</span> to expose',
-      '  <span class="c-dim">➜  press h + enter to show help</span>',
-      ""
-    ], function () { out('<span class="c-dim">dev server running — press Ctrl+C in a real terminal to stop</span>'); });
-  }
-  function build() {
-    stream([
-      '<span class="c-dim">&gt; agrosmart-dashboard@0.4.0 build</span>',
-      '<span class="c-dim">&gt; tsc -b && vite build</span>',
-      "",
-      '<span class="c-bold">vite v6.0.3</span> building for production...',
-      '  <span class="c-dim">transforming (1) src/main.tsx</span>',
-      '  <span class="c-dim">transforming (47) src/components/StatsCard.tsx</span>',
-      '  <span class="c-dim">transforming (112) node_modules/recharts/es6/index.js</span>',
-      '✓ <span class="c-green">1284 modules transformed</span>',
-      '<span class="c-dim">rendering chunks...</span>',
-      'dist/index.html                    <span class="c-cyan">0.42 kB</span> │ gzip:  0.29 kB',
-      'dist/assets/index-Bq7x2.css       <span class="c-cyan">11.86 kB</span> │ gzip:  2.71 kB',
-      'dist/assets/index-Dp4m10.js       <span class="c-cyan">184.03 kB</span> │ gzip: 59.41 kB',
-      "✓ built in <span class='c-bold'>1.34 s</span>"
-    ]);
-  }
-  function test() {
-    stream([
-      '<span class="c-dim">&gt; agrosmart-dashboard@0.4.0 test</span>',
-      '<span class="c-dim">&gt; vitest run</span>',
-      "",
-      ' <span class="c-bold">RUN</span>  v2.1.8  <span class="c-dim">agrosmart-dashboard</span>',
-      "",
-      ' <span class="c-green">✓</span> src/utils/format.test.ts <span class="c-dim">(4 tests)</span> <span class="c-dim">7 ms</span>',
-      ' <span class="c-green">✓</span> src/hooks/useFarmData.test.ts <span class="c-dim">(3 tests)</span> <span class="c-dim">21 ms</span>',
-      ' <span class="c-green">✓</span> src/components/StatsCard.test.tsx <span class="c-dim">(5 tests)</span> <span class="c-dim">38 ms</span>',
-      "",
-      '<span class="c-dim"> Test Files </span>  <span class="c-green">3 passed</span> (3)',
-      '<span class="c-dim">      Tests </span>  <span class="c-green">12 passed</span> (12)',
-      '<span class="c-dim">   Duration </span>  1.06s'
-    ]);
-  }
-  function install() {
-    stream([
-      '<span class="c-dim">⠋ resolving dependencies…</span>',
-      '<span class="c-dim">⠹ fetching react@19.0.0…</span>',
-      "",
-      'added <span class="c-bold">7</span> packages in 2s',
-      '<span class="c-dim">142 packages are looking for funding</span>'
-    ]);
-  }
-  function lint() {
-    stream([
-      '<span class="c-dim">&gt; eslint "src/**/*.{ts,tsx}"</span>',
-      "",
-      App.state.problems.length
-        ? App.state.problems.map(function (p) {
-            return '  <span class="' + (p.sev === "error" ? "c-red" : "c-yellow") + '">' + (p.sev === "error" ? "error" : "warning") + "</span>  " +
-              esc(p.msg) + "\n      <span class=\"c-dim\">" + esc(p.path) + ":" + p.line + ":" + p.col + "</span>";
-          }).join("\n")
-        : '  <span class="c-green">✚ 0 problems (0 errors, 0 warnings)</span>'
-    ]);
-  }
+  ["npm", "npx", "node", "pnpm", "yarn", "bun", "python", "python3", "pip", "cargo", "go", "make", "tsc", "vite", "deno", "java", "dotnet", "ruby", "php"].forEach(function (name) {
+    cmds[name] = function () {
+      out('<span class="c-yellow">' + esc(name) + ': no process host.</span> <span class="c-dim">A browser tab cannot execute local programs. Run this in your own terminal.</span>');
+    };
+  });
 
   /* -------------------------------- exec ------------------------------- */
+  function echoCommand(cmd) {
+    push('<div class="tline tline--prompt"><span class="term__arrow">➜</span> <span class="term__cwd">' + esc(promptPath()) + "</span> <span class=\"c-dim\">" + esc(cmd) + "</span></div>");
+  }
+
   function exec(raw) {
     var line = raw.trim();
     echoCommand(line);
     if (!line) return;
     history.push(line);
+    history = history.slice(-100);
     histIdx = history.length;
     if (line.charAt(0) === "#") return;
-    var parts = line.split(/\s+/);
+    var parts = line.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    parts = parts.map(function (p) { return p.replace(/^["']|["']$/g, ""); });
     var name = parts[0];
-    if (name === "ll") { name = "ls"; parts = ["ls", "-la"].concat(parts.slice(1)); }
-    if (name === "cd") return out('<span class="c-dim">cd is a no-op here — the workspace root is always current</span>');
-    if (name === "sudo") return out('<span class="c-yellow">nice try.</span>');
     if (!cmds[name]) {
-      out('<span class="c-red">command not found: ' + esc(name) + "</span>  <span class=\"c-dim\">type <span class='c-cyan'>help</span></span>");
+      out('<span class="c-red">command not found: ' + esc(name) + "</span> <span class=\"c-dim\">type <span class=\"c-cyan\">help</span> — this shell only reads workspace files</span>");
       return;
     }
-    cmds[name](parts.slice(1));
+    try { cmds[name](parts.slice(1)); }
+    catch (e) { out('<span class="c-red">' + esc(e.message || String(e)) + "</span>"); }
+    scrollDown();
   }
+
   function run(cmd) {
     if (window.App) App.setPanelOpen(true);
-    setTab("terminal");
+    if (window.App) App.setPanelTab("terminal");
     exec(cmd);
+    focus();
   }
-  function setTab(name) {
-    if (window.App) App.setPanelTab(name);
+
+  function clear() {
+    if (!s()) return;
+    cmds.clear();
+    renderPrompt();
+    focus();
   }
+
   function focus() {
     var input = $("#termInput");
-    if (input) { input.value = buffer; input.focus(); }
+    if (!input) return;
+    input.value = buffer;
+    try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
   }
+
   function kill() {
-    sessions.splice(current, 1);
-    if (!sessions.length) newSession(true);
-    current = Math.min(current, sessions.length - 1);
-    switchTo(current);
-    out('<span class="c-dim">[process exited — terminal reused]</span>');
+    if (sessions.length > 1) {
+      sessions.splice(current, 1);
+      current = Math.min(current, sessions.length - 1);
+      renderTabs();
+      switchTo(current);
+    } else {
+      sessions[0] = { lines: [], label: "shell 1", cwd: "" };
+      current = 0;
+      renderTabs();
+      switchTo(0);
+      out('<span class="c-dim">[session cleared — this shell has no process to kill]</span>');
+    }
   }
 
   /* ------------------------------- input IO ---------------------------- */
   function mirror() { $("#termMirror").textContent = buffer; }
+
+  function complete() {
+    if (!WS.loaded) return;
+    var tokens = buffer.split(" ");
+    var token = tokens[tokens.length - 1];
+    var cut = token.lastIndexOf("/");
+    var dirPart = cut >= 0 ? token.slice(0, cut) : "";
+    var prefix = cut >= 0 ? token.slice(cut + 1) : token;
+    var dir = resolve(dirPart || ".");
+    if (!isDir(dir)) return;
+    var node = children(dir);
+    var candidates = node.dirs.map(function (d) { return { name: d + "/", dir: true }; })
+      .concat(node.files.map(function (f) { return { name: f, dir: false }; }))
+      .filter(function (c) { return c.name.toLowerCase().indexOf(prefix.toLowerCase()) === 0; });
+    if (!candidates.length) return;
+    if (candidates.length === 1) {
+      tokens[tokens.length - 1] = (dirPart ? dirPart + "/" : "") + candidates[0].name;
+      buffer = tokens.join(" ");
+      $("#termInput").value = buffer;
+      mirror();
+      return;
+    }
+    out('<span class="c-dim">' + candidates.map(function (c) { return esc(c.name); }).join("  ") + "</span>");
+    scrollDown();
+  }
+
   function wire() {
     var body = $("#termBody");
     var input = $("#termInput");
-    body.addEventListener("click", function (e) {
+    body.addEventListener("click", function () {
       if (window.getSelection().toString()) return;
       focus();
     });
-    body.addEventListener("mouseup", function () { setTimeout(focus, 0); });
     input.addEventListener("focus", function () { $("#termCursor").classList.remove("is-off"); });
     input.addEventListener("blur", function () { $("#termCursor").classList.add("is-off"); });
     input.addEventListener("input", function () {
       buffer = input.value.replace(/[\r\n]+/g, " ");
       input.value = buffer;
       mirror();
-      scrollDown();
     });
     input.addEventListener("keydown", function (e) {
       if (e.ctrlKey && e.key.toLowerCase() === "c") {
         e.preventDefault();
         echoCommand(buffer + "^C");
         buffer = ""; input.value = ""; mirror();
-        if (streamLock) out('<span class="c-dim">interrupted</span>');
-        streamLock = false;
         return;
       }
-      if (e.ctrlKey && e.key.toLowerCase() === "l") { e.preventDefault(); cmds.clear(); return; }
+      if (e.ctrlKey && e.key.toLowerCase() === "l") { e.preventDefault(); clear(); return; }
+      if (e.key === "Tab") { e.preventDefault(); complete(); return; }
       if (e.key === "Enter") {
         e.preventDefault();
         var line = buffer;
@@ -378,6 +425,15 @@
     $("#termTrashBtn").addEventListener("click", kill);
   }
 
+  function workspaceChanged() {
+    sessions.forEach(function (sess) {
+      if (sess.cwd && !isDir(sess.cwd)) sess.cwd = "";
+    });
+    renderPrompt();
+    if (!sessions.length) return;
+    out('<span class="c-dim">workspace ' + (WS.loaded ? "opened: " + esc(WS.projectName) : "closed") + "</span>");
+  }
+
   function init() {
     wire();
     newSession(true);
@@ -388,7 +444,9 @@
     run: run,
     focus: focus,
     kill: kill,
+    clear: clear,
     newSession: function () { newSession(); },
+    workspaceChanged: workspaceChanged,
     output: function (html) { out(html); }
   };
 })();

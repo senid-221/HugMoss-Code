@@ -56,6 +56,8 @@
     dot: function (s) { return svg(s, '<circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/>'); },
     arrowRight: function (s) { return svg(s, p("M5 12h13M13 7l5 5-5 5")); },
     gitCommit: function (s) { return svg(s, '<circle cx="12" cy="12" r="3"/>' + p("M3.5 12h5.5M15 12h5.5")); },
+    lock: function (s) { return svg(s, '<rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/>' + p("M8 10.5V8a4 4 0 0 1 8 0v2.5") + '<circle cx="12" cy="15.2" r=".7" fill="currentColor"/>'); },
+    eye: function (s) { return svg(s, p("M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12z") + '<circle cx="12" cy="12" r="2.8"/>'); },
     file: function (s) { return svg(s, p("M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z") + p("M14 3v5h5")); }
   };
 
