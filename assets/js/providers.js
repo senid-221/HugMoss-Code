@@ -107,7 +107,7 @@
       id: "ollama", name: "Ollama", kind: "openai", mark: "ollama", color: COLORS.ollama,
       baseUrl: "http://localhost:11434/v1", keyUrl: "https://ollama.com/download",
       docs: "https://github.com/ollama/ollama/blob/main/docs/openai.md", auth: "none", keyless: true,
-      cors: true, note: "Run Ollama with OLLAMA_ORIGINS=* so this page may reach localhost.",
+      cors: true, note: "Uses Ollama's native API on localhost. Start it with OLLAMA_ORIGINS=*; installed models are detected and new ones can be downloaded from the model picker.",
       fallback: [
         ["qwen2.5-coder:7b", "Qwen 2.5 Coder 7B"], ["qwen2.5-coder:14b", "Qwen 2.5 Coder 14B"],
         ["llama3.3:70b", "Llama 3.3 70B"], ["deepseek-r1:8b", "DeepSeek R1 8B"]
@@ -216,6 +216,20 @@
       .replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); })
       .replace(/\bGpt\b/g, "GPT").replace(/\bOss\b/g, "OSS").replace(/\bAi\b/g, "AI")
       .replace(/\bLlama\b/g, "Llama");
+  }
+
+  function ollamaLabel(id) {
+    var parts = String(id).split(":");
+    var base = parts[0].split("/").pop();
+    var tag = parts[1] || "";
+    var label = base.replace(/[-_]/g, " ").replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); });
+    label = label
+      .replace(/\bGpt\b/g, "GPT").replace(/\bOss\b/g, "OSS").replace(/\bAi\b/g, "AI")
+      .replace(/\bMinimax\b/g, "MiniMax").replace(/\bLlm\b/g, "LLM");
+    if (tag && tag !== "latest") {
+      label += " " + (/^\d/.test(tag) ? tag.toUpperCase() : tag.replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); }));
+    }
+    return label;
   }
 
   function normalize(provider, items) {
@@ -328,6 +342,84 @@
     }).finally(function () { clearTimeout(timer); });
   }
 
+  /* ------------------------------- Ollama ------------------------------ */
+  var OLLAMA_HOST = "http://localhost:11434";
+
+  function ollamaTags(opts) {
+    opts = opts || {};
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, opts.timeout || 4000);
+    var p = get("ollama");
+    return fetch(OLLAMA_HOST + "/api/tags", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    }).then(function (res) {
+      if (!res.ok) throw new Error("Ollama answered " + res.status + " " + res.statusText);
+      return res.json();
+    }).then(function (data) {
+      return (data.models || []).map(function (m) {
+        var id = m.name || m.model || "";
+        return {
+          id: id,
+          label: ollamaLabel(id),
+          mark: familyFor(id, p),
+          size: m.size || 0,
+          params: (m.details && m.details.parameter_size) || ""
+        };
+      }).sort(function (a, b) { return a.label.localeCompare(b.label); });
+    }).catch(function (err) {
+      if (err && (err.name === "AbortError" || /Failed to fetch|Load failed|NetworkError/i.test(err.message || ""))) {
+        throw new Error("No response from localhost:11434.");
+      }
+      throw err;
+    }).finally(function () { clearTimeout(timer); });
+  }
+
+  function pullOllama(model, onEvent, signal) {
+    return fetch(OLLAMA_HOST + "/api/pull", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+      body: JSON.stringify({ model: model, stream: true }),
+      signal: signal
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (text) {
+          var msg = text;
+          try { msg = JSON.parse(text).error || text; } catch (e) { /* plain-text error */ }
+          throw new Error(msg || "Ollama answered " + res.status);
+        });
+      }
+      if (!res.body || !res.body.getReader) {
+        return res.json().then(function () { return model; });
+      }
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
+      function consume(line) {
+        if (!line.trim()) return;
+        var evt;
+        try { evt = JSON.parse(line); } catch (e) { return; }
+        if (evt.error) throw new Error(evt.error);
+        if (onEvent) onEvent(evt);
+      }
+      function pump() {
+        return reader.read().then(function (step) {
+          if (step.done) {
+            if (buffer.trim()) consume(buffer);
+            return model;
+          }
+          buffer += decoder.decode(step.value, { stream: true });
+          var parts = buffer.split("\n");
+          buffer = parts.pop();
+          parts.forEach(consume);
+          return pump();
+        });
+      }
+      return pump();
+    });
+  }
+
   window.Providers = {
     list: function () { return LIST; },
     available: available,
@@ -348,9 +440,13 @@
     fetchModels: fetchModels,
     cachedModels: cached,
     clearCatalog: clearCatalog,
+    ollamaTags: ollamaTags,
+    pullOllama: pullOllama,
+    ollamaHost: OLLAMA_HOST,
     familyFor: familyFor,
     familyColor: familyColor,
     labelFor: labelFor,
+    ollamaLabel: ollamaLabel,
     mark: function (name, size) {
       return window.Brands.has(name) ? window.Brands.svg(name, size) : window.Brands.svg("openai", size);
     }

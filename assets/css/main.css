@@ -2472,6 +2472,87 @@ select {
 }
 .model-row--more:hover { background: var(--accent-soft); color: var(--accent-hover); }
 
+/* --- ollama --- */
+.provider__badge,
+.model-group__badge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.35px; text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.ollama-card {
+  display: flex; flex-direction: column; gap: 7px;
+  margin: 2px 4px 6px;
+  padding: 9px;
+  font-size: 11.5px; line-height: 1.5;
+  color: var(--text-2);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.ollama-card p { margin: 0; }
+.ollama-card strong { color: var(--text-1); font-weight: 600; }
+.ollama-card a { color: var(--accent); }
+.ollama-card--quiet { flex-direction: row; align-items: center; gap: 8px; color: var(--text-3); }
+.ollama-spinner {
+  flex: 0 0 auto;
+  width: 12px; height: 12px;
+  border: 1.6px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.ollama-hint { font-size: 10.5px; color: var(--text-3); }
+.ollama-hint code {
+  padding: 1px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+  background: var(--bg-raised);
+  border-radius: 3px;
+}
+.ollama-error { font-size: 10.5px; color: var(--danger); }
+.ollama-row { display: flex; align-items: center; gap: 6px; }
+.ollama-suggest { display: flex; flex-direction: column; gap: 2px; margin: 0 -3px; }
+.ollama-suggest .model-row { padding: 4px; }
+.ollama-download {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10.5px; font-weight: 600;
+  color: var(--accent);
+}
+.ollama-pull { display: flex; gap: 6px; }
+.ollama-pull__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  color: var(--text-1);
+  background: var(--bg-editor);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+.ollama-pull__input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.ollama-pull .btn { flex: 0 0 auto; gap: 5px; }
+.ollama-pull-head {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-1);
+}
+.ollama-pull-head span { color: var(--accent); font-variant-numeric: tabular-nums; }
+.ollama-bar { height: 4px; border-radius: 2px; background: var(--bg-active); overflow: hidden; }
+.ollama-bar i {
+  display: block; height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.18s var(--ease);
+}
+
 /* --- terminal prompt --- */
 .tline--prompt { color: var(--text-1); }
 

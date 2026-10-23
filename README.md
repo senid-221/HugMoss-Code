@@ -69,10 +69,32 @@ Keys and preferences live in this browser's `localStorage` only. They are never 
 | OpenRouter | `openrouter.ai/api/v1` | Bearer key |
 | Perplexity | `api.perplexity.ai` | Bearer key (chat only, no tools) |
 | Together AI | `api.together.xyz/v1` | Bearer key |
-| Ollama | `localhost:11434/v1` | No key (local) |
+| Ollama | `localhost:11434` native API (also `/v1`) | No key (local) |
 | Custom endpoint | Any OpenAI-compatible base URL | Optional bearer token |
 
 Streaming is implemented for all three wire formats: OpenAI-compatible SSE, Anthropic Messages SSE, and Gemini `streamGenerateContent` SSE.
+
+### Ollama, without a key
+
+HugMoss uses Ollama's native API, not a proxy. With the Ollama daemon running, the model picker's Ollama group lists every installed model from `GET /api/tags`, with parameter size and disk size. If none are installed, it offers three recommended models and a download field. Downloads stream from `POST /api/pull` with live progress, can be cancelled, and become selectable as soon as they finish. Nothing leaves your machine.
+
+1. Install Ollama from [ollama.com/download](https://ollama.com/download) and start it.
+2. Reload HugMoss and open the model picker. The Ollama group reports `N installed`, `no models`, or `offline`.
+3. Choose an installed model, or type a name such as `qwen2.5-coder:7b` and press **Download**.
+
+If the group reports `offline`, allow this page's origin and retry:
+
+```bash
+# macOS / Linux
+OLLAMA_ORIGINS=* ollama serve
+```
+
+```powershell
+# Windows — then restart Ollama
+setx OLLAMA_ORIGINS "*"
+```
+
+The integration uses Ollama's official local API and brand marks. HugMoss is an independent client and is not endorsed by Ollama.
 
 Provider and model-family marks are official SVG logos inlined in `assets/js/brands.js` (Simple Icons and LobeHub sources), rendered in `currentColor`.
 
@@ -192,6 +214,7 @@ Graphite surfaces with a violet signal colour, Inter for interface text and JetB
 - Read-only mode without Chrome/Edge: editing works in memory, but saves download as files instead of writing to disk.
 - Model availability and tool support depend on the provider; Perplexity is chat-only, and some models reject tool calls.
 - Browser CORS policy can block requests to providers that do not allow web origins.
+- A browser tab cannot install or start Ollama; HugMoss detects a running daemon and can download models through it.
 - Very large folders are truncated at the documented limits rather than partially indexed.
 
 ## Author

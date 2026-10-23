@@ -37,6 +37,7 @@
     stop: function (s) { return svg(s, '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none"/>'); },
     send: function (s) { return svgBold(s, p("M12 19V6") + p("M6.5 11.5L12 6l5.5 5.5")); },
     arrowDown: function (s) { return svg(s, p("M12 5v14M6.5 13.5L12 19l5.5-5.5")); },
+    download: function (s) { return svg(s, p("M12 3.5v11") + p("M7.5 10.5L12 15l4.5-4.5") + p("M4.5 19.5h15")); },
     history: function (s) { return svg(s, p("M4 12a8 8 0 1 0 2.6-5.9") + p("M4 4v4.5h4.5") + p("M12 8v4.2l3 1.8")); },
     sun: function (s) { return svg(s, '<circle cx="12" cy="12" r="4"/>' + p("M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8")); },
     moon: function (s) { return svg(s, p("M20 13.5A8 8 0 0 1 10.5 4a8 8 0 1 0 9.5 9.5z")); },

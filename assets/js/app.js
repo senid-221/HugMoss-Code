@@ -1219,6 +1219,7 @@
         '<button class="provider__head" data-provider-head aria-expanded="' + open + '">' +
         '<span class="provider__mark" data-color="' + HL.esc(p.color || "currentColor") + '">' + Providers.mark(p.mark, 18) + "</span>" +
         '<span class="provider__name">' + HL.esc(p.name) + '<em>' + HL.esc(p.custom ? (cfg.baseUrl || "OpenAI-compatible endpoint") : p.baseUrl.replace(/^https?:\/\//, "")) + "</em></span>" +
+        (p.id === "ollama" ? '<span class="provider__badge">official api</span>' : "") +
         '<span class="provider__state ' + st.cls + '">' + st.text + "</span>" +
         '<span class="provider__chev">' + Icons.ui("chevron", 13) + "</span>" +
         "</button>" + body + "</div>";
@@ -1356,19 +1357,28 @@
     btn.disabled = true;
     providerMsg(id, "Contacting " + p.name + "…");
     try {
-      var result = await Providers.fetchModels(p, { force: true, apiKey: typedKey || undefined });
-      providerMsg(id, "Reachable · " + plural(result.models.length, "model") + " available · " + (result.ms || 0) + " ms" + (unsaved ? " · press Save to keep this key" : ""), "ok");
+      var result = p.id === "ollama"
+        ? { models: await Providers.ollamaTags(), ms: 0 }
+        : await Providers.fetchModels(p, { force: true, apiKey: typedKey || undefined });
+      var detail = result.models.length
+        ? plural(result.models.length, "model") + " available"
+        : (p.id === "ollama" ? "no models installed yet · download one from the model picker" : "no models installed yet");
+      providerMsg(id, "Reachable · " + detail + (p.id === "ollama" ? "" : " · " + (result.ms || 0) + " ms") + (unsaved ? " · press Save to keep this key" : ""), "ok");
       renderProviders();
       providerOpen[id] = true;
       renderProviders();
-      if (!Providers.selection() && !unsaved) {
+      if (!Providers.selection() && !unsaved && result.models.length) {
         Providers.setSelection(id, result.models[0].id, result.models[0].label);
         refreshAgentUI();
       }
       updateWorkspaceChrome();
-      toast({ title: p.name + " is reachable", msg: plural(result.models.length, "chat model") + " returned." + (unsaved ? " Save the key to use them." : ""), type: "success" });
+      toast({
+        title: p.id === "ollama" ? "Ollama is running" : p.name + " is reachable",
+        msg: result.models.length ? plural(result.models.length, "chat model") + " returned." + (unsaved ? " Save the key to use them." : "") : "No models installed yet. Download one from the model picker.",
+        type: "success"
+      });
     } catch (e) {
-      var hint = /Failed to fetch|Load failed|NetworkError/i.test(e.message || "")
+      var hint = /Failed to fetch|Load failed|NetworkError|No response from localhost/i.test(e.message || "")
         ? " The browser could not reach " + (p.id === "ollama" ? "Ollama. Start it with OLLAMA_ORIGINS=*." : p.name + ". Check CORS, the key, or serve this page over http://localhost.")
         : "";
       providerMsg(id, (e.message || String(e)) + hint, "err");
