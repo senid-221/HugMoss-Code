@@ -1,5 +1,7 @@
 # HugMoss Code
 
+<p align="center"><img src="assets/img/hugmoss-128.png" width="96" height="96" alt="HugMoss logo"></p>
+
 A browser-based agentic coding IDE. Open a real folder from your disk, edit real files, and talk to a real language model through your own API key — with an agent that reads, searches, plans, and writes files under your approval.
 
 No build step, no package manager, no backend. HugMoss is plain HTML, CSS and JavaScript.
@@ -172,6 +174,7 @@ history · clear · date · echo         shell utilities
 index.html              application shell and UI structure
 assets/css/main.css     design tokens, both themes, all component styles
 assets/js/brands.js     official provider and model marks as inline SVG
+assets/img/             HugMoss brand mark, favicons and touch icon
 assets/js/providers.js  provider registry, key storage and model catalogues
 assets/js/fs.js         File System Access workspace, fallbacks, diff baselines
 assets/js/ai.js         SSE transport for OpenAI-compatible, Anthropic and Gemini APIs

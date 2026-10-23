@@ -205,6 +205,7 @@ input, textarea { outline: none; }
 .titlebar__right { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 
 .logo { display: flex; }
+.logo img { display: block; width: 20px; height: 20px; }
 .wordmark { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
 
 .menubar { display: flex; gap: 1px; }
@@ -864,6 +865,7 @@ kbd {
 }
 .welcome__inner { width: 100%; max-width: 460px; }
 .welcome__logo { margin-bottom: 14px; }
+.welcome__logo img { display: block; width: 56px; height: 56px; }
 .welcome__title { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.3px; }
 .welcome__sub { margin: 0 0 24px; font-size: 13px; color: var(--text-2); }
 .welcome__shortcuts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
@@ -1121,8 +1123,8 @@ kbd {
   padding: 20px 4px;
   text-align: center;
 }
-.agent__empty-mark { color: var(--accent); margin-bottom: 6px; }
-.agent__empty-mark svg { width: 30px; height: 30px; }
+.agent__empty-mark { margin-bottom: 10px; }
+.agent__empty-mark img { display: block; width: 42px; height: 42px; }
 .agent__empty-title { margin: 0; font-size: 15px; font-weight: 600; }
 .agent__empty-credit { margin: 0 0 16px; font-size: 11.5px; color: var(--text-3); }
 .agent__suggestions { display: flex; flex-direction: column; gap: 6px; width: 100%; }
@@ -1167,12 +1169,9 @@ kbd {
 .agent-avatar {
   flex: 0 0 22px; height: 22px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #9d7bff, #6a48f2);
-  color: #fff;
   margin-top: 1px;
 }
-.agent-avatar svg { width: 13px; height: 13px; }
+.agent-avatar img { display: block; width: 20px; height: 20px; }
 .msg__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 
 .prose {
@@ -1760,6 +1759,7 @@ kbd {
   border-bottom: 1px solid var(--border);
 }
 .modal__head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.modal__logo { width: 18px; height: 18px; vertical-align: -3px; margin-right: 7px; }
 .modal__body { padding: 6px 16px 14px; overflow-y: auto; }
 .modal__foot {
   display: flex; justify-content: flex-end; gap: 8px;
@@ -2381,6 +2381,7 @@ select {
   flex: 0 0 auto;
   color: var(--text-1);
 }
+.model-picker__logo img { display: block; width: 14px; height: 14px; }
 .model-pop {
   width: min(340px, calc(100% - 16px));
   max-width: calc(100vw - 24px);

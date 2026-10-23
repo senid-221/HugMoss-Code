@@ -209,7 +209,7 @@
   }
   function agentShell() {
     var node = el('<div class="msg msg--agent"><div class="msg__agent-row">' +
-      '<span class="agent-avatar">' + Icons.ui("sparkle", 13) + "</span>" +
+      '<span class="agent-avatar"><img src="assets/img/hugmoss-32.png" alt="" width="20" height="20"></span>' +
       '<div class="msg__body"></div></div></div>');
     add(node);
     return $(".msg__body", node);
@@ -649,7 +649,7 @@
     if (!nameEl) return;
     if (!sel) {
       nameEl.textContent = "Select model";
-      if (logoEl) { logoEl.innerHTML = Icons.ui("sparkle", 13); logoEl.style.removeProperty("color"); }
+      if (logoEl) { logoEl.innerHTML = '<img src="assets/img/hugmoss-32.png" alt="" width="14" height="14">'; logoEl.style.removeProperty("color"); }
       $("#modelBtn").title = "Choose an AI provider and model";
       return;
     }
@@ -1343,7 +1343,7 @@
     ctx = [];
     todoApi = null;
     streamEl().innerHTML =
-      '<div class="agent__empty" id="agentEmpty"><div class="agent__empty-mark">' + Icons.ui("sparkleLarge", 30) + "</div>" +
+      '<div class="agent__empty" id="agentEmpty"><div class="agent__empty-mark"><img src="assets/img/hugmoss-128.png" alt="" width="42" height="42"></div>' +
       '<h3 class="agent__empty-title">Hi Vincent, I&rsquo;m your coding agent</h3>' +
       '<p class="agent__empty-credit">Built by IRAGUHA Vincent</p>' +
       '<div class="agent__suggestions" id="agentSuggestions"></div></div>';
