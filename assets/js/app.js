@@ -1262,6 +1262,14 @@
     $("#providerCount").textContent = Providers.configuredCount() + " configured";
   }
 
+  function updateGatewayNote() {
+    var note = $("#providerNote");
+    if (!note) return;
+    note.innerHTML = Providers.gatewayOn()
+      ? "HugMoss keeps your keys in this browser&rsquo;s localStorage. The local gateway relays each request and forwards your key per request without storing it."
+      : "HugMoss keeps your keys in this browser&rsquo;s localStorage. This page is running in direct mode, so requests go straight from this tab to the provider.";
+  }
+
   function providerMsg(id, text, cls) {
     var wrap = $('.provider[data-provider="' + id + '"]');
     var msg = wrap && $("[data-msg]", wrap);
@@ -1378,10 +1386,17 @@
         type: "success"
       });
     } catch (e) {
-      var hint = /Failed to fetch|Load failed|NetworkError|No response from localhost/i.test(e.message || "")
-        ? " The browser could not reach " + (p.id === "ollama" ? "Ollama. Start it with OLLAMA_ORIGINS=*." : p.name + ". Check CORS, the key, or serve this page over http://localhost.")
-        : "";
-      providerMsg(id, (e.message || String(e)) + hint, "err");
+      var message = e.message || String(e);
+      var network = /Failed to fetch|Load failed|NetworkError|No response from localhost/i.test(message);
+      var hint = "";
+      if (network) {
+        hint = Providers.gatewayOn()
+          ? " The gateway could not reach " + (p.id === "ollama" ? "Ollama on its host." : p.name + ". Check the gateway logs and its network access.")
+          : " The browser could not reach " + (p.id === "ollama" ? "Ollama. Start it with OLLAMA_ORIGINS=*." : p.name + ". Check CORS, the key, or serve this page over http://localhost.");
+      } else if (Providers.gatewayOn() && p.id === "ollama" && /not reachable/i.test(message)) {
+        hint = " Set OLLAMA_URL if Ollama runs on another machine.";
+      }
+      providerMsg(id, message + hint, "err");
       renderProviders();
       providerOpen[id] = true;
       renderProviders();
@@ -2574,7 +2589,14 @@
       logOutput("workspace", "could not restore the last folder: " + (e.message || e), "out-warn");
     });
 
-    logOutput("hugmoss", "ready · no backend · keys and files stay in this browser", "out-info");
+    Providers.probeGateway().then(function (on) {
+      updateGatewayNote();
+      logOutput(
+        "hugmoss",
+        on ? "ready · gateway connected · keys are forwarded per request" : "ready · direct mode · keys and files stay in this browser",
+        "out-info"
+      );
+    });
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () { renderMinimap(); });
     }

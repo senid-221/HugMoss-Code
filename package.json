@@ -1,0 +1,14 @@
+{
+  "name": "hugmoss-code",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HugMoss Code — browser-based agentic coding IDE with an optional zero-dependency BYOK gateway.",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "start": "node server/index.js",
+    "dev": "node server/index.js --source"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

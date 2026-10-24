@@ -115,7 +115,7 @@
   }
 
   async function streamOpenAI(provider, opts) {
-    var url = Providers.baseUrl(provider).replace(/\/+$/, "") + "/chat/completions";
+    var url = Providers.apiUrl(provider, "/chat/completions");
     var body = {
       model: opts.model,
       messages: openAIMessages(opts.system, opts.messages),
@@ -218,7 +218,7 @@
   }
 
   async function streamAnthropic(provider, opts) {
-    var url = Providers.baseUrl(provider).replace(/\/+$/, "") + "/messages";
+    var url = Providers.apiUrl(provider, "/messages");
     var body = {
       model: opts.model,
       max_tokens: opts.maxTokens || 8192,
@@ -321,8 +321,9 @@
   }
 
   async function streamGemini(provider, opts) {
-    var base = Providers.baseUrl(provider).replace(/\/+$/, "");
-    var url = base + "/models/" + encodeURIComponent(opts.model) + ":streamGenerateContent?alt=sse&key=" + encodeURIComponent(opts.apiKey || "");
+    var route = "/models/" + encodeURIComponent(opts.model) + ":streamGenerateContent?alt=sse";
+    var url = Providers.apiUrl(provider, route);
+    if (!Providers.usesGateway(provider)) url += "&key=" + encodeURIComponent(opts.apiKey || "");
     var body = {
       systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
       contents: geminiContents(opts.messages),
@@ -392,6 +393,7 @@
   async function stream(opts) {
     var provider = Providers.get(opts.providerId);
     if (!provider) throw AIError("Unknown provider: " + opts.providerId);
+    await Providers.probeGateway();
     if (!opts.model) throw AIError("Choose a model first.");
     if (!provider.keyless && !opts.apiKey) throw AIError("No API key is configured for " + provider.name + ".");
     if (provider.custom && !Providers.baseUrl(provider)) throw AIError("Set a base URL for your custom endpoint in Settings.");
@@ -403,9 +405,16 @@
       if (err && err.name === "AbortError") throw err;
       if (err && err.name === "AIError") throw err;
       if (err instanceof TypeError) {
-        var hint = provider.id === "ollama"
-          ? "Could not reach Ollama at " + Providers.baseUrl(provider) + ". Is it running, and started with OLLAMA_ORIGINS=*?"
-          : "Could not reach " + provider.name + ". Check your connection, the API key, and CORS/proxy settings.";
+        var hint;
+        if (provider.id === "ollama") {
+          hint = Providers.gatewayOn()
+            ? "Could not reach Ollama through the gateway. Make sure it is running on the gateway host."
+            : "Could not reach Ollama at " + Providers.baseUrl(provider) + ". Is it running, and started with OLLAMA_ORIGINS=*?";
+        } else if (Providers.gatewayOn()) {
+          hint = "Could not reach " + provider.name + " through the gateway. Check the gateway logs and its network access.";
+        } else {
+          hint = "Could not reach " + provider.name + ". Check your connection, the API key, and CORS/proxy settings.";
+        }
         throw AIError(hint + (err.message ? " (" + err.message + ")" : ""), 0, provider.name);
       }
       throw AIError(err && err.message || "The request failed.", err && err.status || 0, provider.name);

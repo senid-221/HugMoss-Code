@@ -4,14 +4,19 @@
 
 A browser-based agentic coding IDE. Open a real folder from your disk, edit real files, and talk to a real language model through your own API key — with an agent that reads, searches, plans, and writes files under your approval.
 
-No build step, no package manager, no backend. HugMoss is plain HTML, CSS and JavaScript.
+HugMoss runs in two modes:
+
+- **Gateway mode** — the bundled Node server serves the app and relays provider traffic, which removes browser CORS limits and keeps Ollama on localhost. Recommended for local use and deployment.
+- **Direct mode** — host `index.html` and `assets/` on any static server. The browser calls providers itself, exactly as it did before the gateway existed. HugMoss detects which mode it is in at startup.
+
+There are no runtime dependencies, no framework, and no build step beyond copying static files.
 
 ---
 
 ## What is real
 
-- **The workspace** is your folder. HugMoss uses the File System Access API to read and write files in place. Nothing is uploaded to a HugMoss server.
-- **The agent** calls provider APIs directly from the tab using your key. There is no relay, no proxy, and no bundled model.
+- **The workspace** is your folder. HugMoss uses the File System Access API to read and write files in place. File contents are never uploaded to a HugMoss service.
+- **The agent** calls the selected provider with your key. In gateway mode the key is forwarded per request by your own server; in direct mode it goes straight from the tab to the provider. No key is stored server-side.
 - **The changes view** compares your session edits against the folder contents from the moment you opened it, and against what is currently on disk.
 - **The terminal** is a file shell over the open folder. It lists, reads, and searches files; it does not execute programs.
 
@@ -31,12 +36,27 @@ A browser tab cannot spawn processes, attach a debugger, run a language server, 
 
 ## Run it
 
+Node.js 20 or newer is required for the gateway.
+
 ```bash
 git clone https://github.com/senid-221/HugMoss-Code.git
 cd HugMoss-Code
+
+npm run build     # copies index.html and assets/ into dist/
+npm start         # serves dist/ and the /api gateway on http://localhost:3000
 ```
 
-Open `index.html` directly, or serve the folder over localhost (recommended for provider calls and Ollama):
+For development without the copy step:
+
+```bash
+npm run dev       # serves index.html and assets/ directly, same gateway
+```
+
+Change the port with `PORT=8080 npm start` (macOS/Linux) or `$env:PORT=8080; npm start` (PowerShell). The first line of output confirms the web root, port, and Ollama upstream.
+
+### Static-only mode
+
+The app still works without Node. Serve the repository root (or `dist/`) with any static server:
 
 ```bash
 python -m http.server 8080
@@ -44,9 +64,64 @@ python -m http.server 8080
 npx serve .
 ```
 
-Then visit `http://localhost:8080`.
+Then visit `http://localhost:8080`. At startup the app probes `/api/health`; when no gateway answers, it falls back to direct browser calls. Direct mode requires provider CORS support — see [CORS](#cors-and-direct-mode).
 
 Chrome or Edge is required for folder write access. Firefox and Safari fall back to read-only file picking, drag-and-drop, and the editor without disk writes.
+
+## Gateway
+
+The gateway is a small zero-dependency HTTP server in `server/`. It does three jobs:
+
+1. Serves the built app from `dist/` (or the source tree with `npm run dev`).
+2. Proxies model discovery and chat traffic for every provider in the registry, adding auth headers server-side.
+3. Proxies Ollama's native `/api/tags` and `/api/pull` endpoints, so Ollama can stay bound to `127.0.0.1` with no CORS flags.
+
+At startup the frontend calls `GET /api/health`. If it returns `{"ok":true,"service":"hugmoss-gateway"}`, the app routes provider and Ollama requests through the same origin. Otherwise it uses direct mode. The switch is automatic and visible in **Settings → AI providers**.
+
+### Routes
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Capability probe used by the frontend |
+| `GET/POST /api/ai/:provider/*` | Streamed provider proxy; `:provider` must be in the allowlist |
+| `GET /api/ollama/tags` | Installed Ollama models |
+| `POST /api/ollama/pull` | Download an Ollama model (NDJSON progress stream) |
+
+Supported provider IDs: `openai`, `anthropic`, `google`, `xai`, `mistral`, `deepseek`, `groq`, `openrouter`, `together`, `perplexity`, `ollama`.
+
+### How keys flow
+
+Keys stay in the browser's `localStorage`, as before. For a gateway request, the browser sends the key in the `x-hugmoss-key` header. The gateway uses it once, injects the provider-specific auth header (`Authorization`, `x-api-key` + `anthropic-version`, or `x-goog-api-key`), and forwards the request. The key is never written to disk, placed in a URL, or logged. The gateway is stateless.
+
+Custom OpenAI-compatible endpoints deliberately stay in direct mode. Proxying arbitrary user-supplied URLs would turn the gateway into an SSRF vector.
+
+### Configuration
+
+All variables are optional.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PORT` | `3000` | Listen port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama upstream the gateway calls |
+| `ALLOWED_ORIGINS` | _(none)_ | Extra comma-separated origins allowed to call `/api`; same-origin is always allowed |
+| `RATE_LIMIT` | `120` | Requests per minute per client IP |
+| `BODY_LIMIT` | `8388608` | Maximum request body in bytes |
+| `TRUST_PROXY` | `0` | Set to `1` only behind a trusted reverse proxy that sets `x-forwarded-for` |
+
+Cross-origin API calls are rejected unless their origin is listed in `ALLOWED_ORIGINS`; the gateway's own origin always works. Keep the list empty when the gateway serves the app, and add entries only when a separately hosted frontend must reach the API.
+
+### Deploying
+
+The gateway is a standard Node HTTP server, so any Node 20+ host works. Use:
+
+- **Build command:** `npm run build`
+- **Start command:** `npm start`
+- **Health check:** `/api/health`
+
+On Render, Railway, Fly.io, or a VPS, set `PORT` if the platform requires it. `HOST=0.0.0.0` is the default so container routing works. For Ollama on a platform, point `OLLAMA_URL` at a reachable Ollama host — `localhost` inside a container is not your laptop.
+
+The gateway has no user accounts. If you expose it publicly, put it behind your platform's access control or an authenticating reverse proxy. It is designed for single-user or trusted-team use.
 
 ## Connect an AI provider
 
@@ -55,15 +130,15 @@ Chrome or Edge is required for folder write access. Firefox and Safari fall back
 3. Open the model picker in the agent composer and choose a model. Models are fetched live from the provider; a curated fallback list appears when the catalog is unavailable.
 4. Ask a question, or switch to **Agent** mode and describe a task.
 
-Keys and preferences live in this browser's `localStorage` only. They are never sent anywhere except the provider you selected. Use **Remove key** to delete one.
+Keys and preferences live in this browser's `localStorage` only. In gateway mode they are forwarded per request by your server and not stored; in direct mode they go straight to the provider. Use **Remove key** to delete one.
 
 ### Supported providers
 
 | Provider | API | Auth |
 | --- | --- | --- |
 | OpenAI | `api.openai.com/v1` | Bearer key |
-| Anthropic | `api.anthropic.com/v1` | `x-api-key` + direct-browser header |
-| Google Gemini | `generativelanguage.googleapis.com/v1beta` | Key in query string |
+| Anthropic | `api.anthropic.com/v1` | `x-api-key`; direct mode adds the direct-browser header |
+| Google Gemini | `generativelanguage.googleapis.com/v1beta` | Query key in direct mode, `x-goog-api-key` through the gateway |
 | xAI | `api.x.ai/v1` | Bearer key |
 | Mistral AI | `api.mistral.ai/v1` | Bearer key |
 | DeepSeek | `api.deepseek.com/v1` | Bearer key |
@@ -72,19 +147,22 @@ Keys and preferences live in this browser's `localStorage` only. They are never 
 | Perplexity | `api.perplexity.ai` | Bearer key (chat only, no tools) |
 | Together AI | `api.together.xyz/v1` | Bearer key |
 | Ollama | `localhost:11434` native API (also `/v1`) | No key (local) |
-| Custom endpoint | Any OpenAI-compatible base URL | Optional bearer token |
+| Custom endpoint | Any OpenAI-compatible base URL | Optional bearer token (direct mode) |
 
-Streaming is implemented for all three wire formats: OpenAI-compatible SSE, Anthropic Messages SSE, and Gemini `streamGenerateContent` SSE.
+Streaming is implemented for all three wire formats: OpenAI-compatible SSE, Anthropic Messages SSE, and Gemini `streamGenerateContent` SSE. The gateway streams responses through without buffering.
 
 ### Ollama, without a key
 
-HugMoss uses Ollama's native API, not a proxy. With the Ollama daemon running, the model picker's Ollama group lists every installed model from `GET /api/tags`, with parameter size and disk size. If none are installed, it offers three recommended models and a download field. Downloads stream from `POST /api/pull` with live progress, can be cancelled, and become selectable as soon as they finish. Nothing leaves your machine.
+HugMoss uses Ollama's native API. With the daemon running, the model picker's Ollama group lists every installed model from `GET /api/tags`, with parameter size and disk size. If none are installed, it offers three recommended models and a download field. Downloads stream from `POST /api/pull` with live progress, can be cancelled, and become selectable as soon as they finish. Nothing leaves your machine.
 
 1. Install Ollama from [ollama.com/download](https://ollama.com/download) and start it.
-2. Reload HugMoss and open the model picker. The Ollama group reports `N installed`, `no models`, or `offline`.
-3. Choose an installed model, or type a name such as `qwen2.5-coder:7b` and press **Download**.
+2. Start HugMoss with the gateway (`npm start`), or allow this page's origin in direct mode (below).
+3. Reload HugMoss and open the model picker. The Ollama group reports `N installed`, `no models`, or `offline`.
+4. Choose an installed model, or type a name such as `qwen2.5-coder:7b` and press **Download**.
 
-If the group reports `offline`, allow this page's origin and retry:
+In gateway mode, Ollama can stay on `127.0.0.1` with no extra flags because the server calls it directly. Set `OLLAMA_URL` if Ollama runs elsewhere.
+
+In direct mode, allow this page's origin and retry:
 
 ```bash
 # macOS / Linux
@@ -100,13 +178,13 @@ The integration uses Ollama's official local API and brand marks. HugMoss is an 
 
 Provider and model-family marks are official SVG logos inlined in `assets/js/brands.js` (Simple Icons and LobeHub sources), rendered in `currentColor`.
 
-### CORS notes
+### CORS and direct mode
 
-Provider calls originate in your browser, so the provider must allow browser requests.
+In direct mode, provider calls originate in your browser, so the provider must allow browser requests. The gateway exists to remove this constraint.
 
-- **Ollama**: start it with `OLLAMA_ORIGINS=*` so this page can reach `localhost`.
-- **Anthropic**: HugMoss sends `anthropic-dangerous-direct-browser-access: true`, which Anthropic requires for browser calls.
-- **OpenAI, Gemini, xAI, Mistral, DeepSeek, Groq, OpenRouter, Together**: blocked by CORS on some networks. Serve HugMoss from `localhost` and check the browser console if a request is refused. Custom endpoints can sit behind your own proxy if a provider does not allow browsers.
+- **Ollama**: start it with `OLLAMA_ORIGINS=*` so this page can reach `localhost`, or use the gateway.
+- **Anthropic**: direct mode sends `anthropic-dangerous-direct-browser-access: true`, which Anthropic requires for browser calls. The gateway sends the standard server-side auth instead.
+- **OpenAI, Gemini, xAI, Mistral, DeepSeek, Groq, OpenRouter, Together**: some networks and providers reject browser origins. Run the gateway when a request is blocked.
 
 ## The agent
 
@@ -175,7 +253,7 @@ index.html              application shell and UI structure
 assets/css/main.css     design tokens, both themes, all component styles
 assets/js/brands.js     official provider and model marks as inline SVG
 assets/img/             HugMoss brand mark, favicons and touch icon
-assets/js/providers.js  provider registry, key storage and model catalogues
+assets/js/providers.js  provider registry, key storage, model catalogues, gateway routing
 assets/js/fs.js         File System Access workspace, fallbacks, diff baselines
 assets/js/ai.js         SSE transport for OpenAI-compatible, Anthropic and Gemini APIs
 assets/js/icons.js      interface and file-type icons
@@ -183,9 +261,13 @@ assets/js/highlight.js  syntax tokenizer and LCS line diff
 assets/js/app.js        tabs, editor, minimap, explorer, search, changes, palette, settings
 assets/js/terminal.js   file shell and command implementations
 assets/js/agent.js      agent loop, tools, approvals, todos and message rendering
+server/index.js         HTTP server, static assets, provider and Ollama proxy
+server/providers.js     upstream allowlist and auth-header construction
+scripts/build.js        copies index.html and assets/ into dist/
+package.json            build, dev and start scripts; no dependencies
 ```
 
-Everything is plain JavaScript in IIFEs — no framework, bundler or runtime dependency. The only external asset is Google Fonts (Inter, JetBrains Mono); the design falls back to system fonts offline.
+Everything is plain JavaScript. The gateway uses only Node built-ins. `npm run build` copies static files; there is no bundler. The only external asset is Google Fonts (Inter, JetBrains Mono); the design falls back to system fonts offline.
 
 ## Local storage keys
 
@@ -198,12 +280,14 @@ Everything is plain JavaScript in IIFEs — no framework, bundler or runtime dep
 | `hugmoss.sessions.v1` | Recent agent sessions |
 | `hugmoss.ide.settings.v2` | Theme, layout, font, wrap and mode preferences |
 
-The last folder handle is stored in IndexedDB (`hugmoss-workspace`) so it can be restored after a reload.
+The last folder handle is stored in IndexedDB (`hugmoss-workspace`) so it can be restored after a reload. Gateway mode is detected at runtime and is not persisted.
 
 ## Security
 
-- Keys stay in `localStorage` and in memory for requests to the chosen provider. There is no HugMoss backend and no telemetry.
-- Anyone with access to this browser profile can read those keys. Use a dedicated key with a spending limit, and remove it when you are done.
+- Keys stay in `localStorage` and in request memory. The gateway forwards them per request and never stores or logs them.
+- Provider targets are a fixed allowlist; arbitrary upstream URLs, path traversal, and encoded dot segments are rejected.
+- The gateway enforces same-origin API access by default, a per-IP rate limit, request body limits, and a fixed static-file root.
+- Anyone with access to this browser profile can read stored keys. Use a dedicated key with a spending limit, and remove it when you are done.
 - The agent never reads env or credential files. Writes always require explicit approval.
 - Do not commit `localStorage` exports, `.env` files, or keys into this repository.
 
@@ -216,7 +300,8 @@ Graphite surfaces with a violet signal colour, Inter for interface text and JetB
 - No process execution, debugger, language server, git client, or extension host.
 - Read-only mode without Chrome/Edge: editing works in memory, but saves download as files instead of writing to disk.
 - Model availability and tool support depend on the provider; Perplexity is chat-only, and some models reject tool calls.
-- Browser CORS policy can block requests to providers that do not allow web origins.
+- Custom OpenAI-compatible endpoints bypass the gateway by design, so they remain subject to browser CORS and mixed-content rules.
+- The gateway is single-user software without accounts; add access control before exposing it publicly.
 - A browser tab cannot install or start Ollama; HugMoss detects a running daemon and can download models through it.
 - Very large folders are truncated at the documented limits rather than partially indexed.
 

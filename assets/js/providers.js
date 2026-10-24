@@ -14,6 +14,8 @@
     qwen: "#615ced", kimi: "currentColor"
   };
 
+  var GATEWAY = { on: false, info: null, promise: null };
+
   var LIST = [
     {
       id: "openai", name: "OpenAI", kind: "openai", mark: "openai", color: COLORS.openai,
@@ -107,7 +109,7 @@
       id: "ollama", name: "Ollama", kind: "openai", mark: "ollama", color: COLORS.ollama,
       baseUrl: "http://localhost:11434/v1", keyUrl: "https://ollama.com/download",
       docs: "https://github.com/ollama/ollama/blob/main/docs/openai.md", auth: "none", keyless: true,
-      cors: true, note: "Uses Ollama's native API on localhost. Start it with OLLAMA_ORIGINS=*; installed models are detected and new ones can be downloaded from the model picker.",
+      cors: true, note: "Uses Ollama's native API. Direct browser access needs OLLAMA_ORIGINS=*; through the gateway, Ollama can stay bound to localhost. Installed models are detected and new ones download from the model picker.",
       fallback: [
         ["qwen2.5-coder:7b", "Qwen 2.5 Coder 7B"], ["qwen2.5-coder:14b", "Qwen 2.5 Coder 14B"],
         ["llama3.3:70b", "Llama 3.3 70B"], ["deepseek-r1:8b", "DeepSeek R1 8B"]
@@ -120,6 +122,45 @@
       fallback: []
     }
   ];
+
+  function probeGateway(force) {
+    if (GATEWAY.promise && !force) return GATEWAY.promise;
+    var offline = typeof window === "undefined" || typeof fetch !== "function" ||
+      (window.location && window.location.protocol === "file:");
+    if (offline) {
+      GATEWAY.on = false;
+      GATEWAY.promise = Promise.resolve(false);
+      return GATEWAY.promise;
+    }
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 2500) : null;
+    GATEWAY.promise = fetch("/api/health", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: controller ? controller.signal : undefined
+    }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (info) {
+      GATEWAY.on = !!(info && info.ok && info.service === "hugmoss-gateway");
+      GATEWAY.info = GATEWAY.on ? info : null;
+      return GATEWAY.on;
+    }).catch(function () {
+      GATEWAY.on = false;
+      GATEWAY.info = null;
+      return false;
+    }).then(function (on) {
+      if (timer) clearTimeout(timer);
+      return on;
+    });
+    return GATEWAY.promise;
+  }
+
+  function gatewayOn() { return GATEWAY.on; }
+  function gatewayInfo() { return GATEWAY.info; }
+  function usesGateway(provider) {
+    return !!(GATEWAY.on && provider && !provider.custom);
+  }
 
   function readJson(key, fallback) {
     try {
@@ -153,6 +194,10 @@
     if (!p) return "";
     if (p.custom) return customConfig().baseUrl.replace(/\/+$/, "");
     return p.baseUrl;
+  }
+  function apiUrl(provider, route) {
+    if (usesGateway(provider)) return "/api/ai/" + provider.id + route;
+    return baseUrl(provider).replace(/\/+$/, "") + route;
   }
   function available() {
     return LIST.filter(function (p) { return !p.custom || baseUrl(p); });
@@ -268,6 +313,11 @@
   }
 
   function headers(provider, apiKey) {
+    if (usesGateway(provider)) {
+      var viaGateway = {};
+      if (apiKey) viaGateway["x-hugmoss-key"] = apiKey;
+      return viaGateway;
+    }
     var h = {};
     if (provider.auth === "bearer" && apiKey) h.Authorization = "Bearer " + apiKey;
     if (provider.auth === "x-api-key") {
@@ -280,17 +330,21 @@
   }
 
   function withQuery(url, provider, apiKey) {
-    if (provider.auth !== "query" || !apiKey) return url;
+    if (usesGateway(provider) || provider.auth !== "query" || !apiKey) return url;
     return url + (url.indexOf("?") >= 0 ? "&" : "?") + "key=" + encodeURIComponent(apiKey);
   }
 
-  function modelsUrl(provider) {
-    var base = baseUrl(provider);
-    if (provider.kind === "gemini") return base + "/models?pageSize=1000";
-    return base + (provider.modelsPath || "/models");
+  function modelsPath(provider) {
+    if (provider.kind === "gemini") return "/models?pageSize=1000";
+    return provider.modelsPath || "/models";
   }
 
-  function fetchModels(provider, opts) {
+  function modelsUrl(provider) {
+    return apiUrl(provider, modelsPath(provider));
+  }
+
+  async function fetchModels(provider, opts) {
+    await probeGateway();
     opts = opts || {};
     var apiKey = opts.apiKey || key(provider.id);
     if (!provider.custom && !provider.keyless && !apiKey) return Promise.reject(new Error("Add an API key for " + provider.name + " first."));
@@ -345,17 +399,33 @@
   /* ------------------------------- Ollama ------------------------------ */
   var OLLAMA_HOST = "http://localhost:11434";
 
-  function ollamaTags(opts) {
+  function responseError(text, status) {
+    try {
+      var data = JSON.parse(text);
+      var error = data && data.error;
+      if (error && typeof error === "object") return error.message || JSON.stringify(error);
+      if (typeof error === "string") return error;
+    } catch (e) { /* plain-text error body */ }
+    return text || "Ollama answered " + status;
+  }
+
+  async function ollamaTags(opts) {
+    await probeGateway();
     opts = opts || {};
     var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, opts.timeout || 4000);
+    var timer = setTimeout(function () { controller.abort(); }, opts.timeout || 12000);
     var p = get("ollama");
-    return fetch(OLLAMA_HOST + "/api/tags", {
+    var url = GATEWAY.on ? "/api/ollama/tags" : OLLAMA_HOST + "/api/tags";
+    return fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       signal: controller.signal
     }).then(function (res) {
-      if (!res.ok) throw new Error("Ollama answered " + res.status + " " + res.statusText);
+      if (!res.ok) {
+        return res.text().then(function (text) {
+          throw new Error(responseError(text, res.status));
+        });
+      }
       return res.json();
     }).then(function (data) {
       return (data.models || []).map(function (m) {
@@ -369,15 +439,20 @@
         };
       }).sort(function (a, b) { return a.label.localeCompare(b.label); });
     }).catch(function (err) {
-      if (err && (err.name === "AbortError" || /Failed to fetch|Load failed|NetworkError/i.test(err.message || ""))) {
-        throw new Error("No response from localhost:11434.");
+      if (err && err.name === "AbortError") {
+        throw new Error("Ollama did not answer in time. Retry in a moment.");
+      }
+      if (err && /Failed to fetch|Load failed|NetworkError/i.test(err.message || "")) {
+        throw new Error(GATEWAY.on ? "No response from the HugMoss gateway." : "No response from localhost:11434.");
       }
       throw err;
     }).finally(function () { clearTimeout(timer); });
   }
 
-  function pullOllama(model, onEvent, signal) {
-    return fetch(OLLAMA_HOST + "/api/pull", {
+  async function pullOllama(model, onEvent, signal) {
+    await probeGateway();
+    var url = GATEWAY.on ? "/api/ollama/pull" : OLLAMA_HOST + "/api/pull";
+    return fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
       body: JSON.stringify({ model: model, stream: true }),
@@ -385,9 +460,7 @@
     }).then(function (res) {
       if (!res.ok) {
         return res.text().then(function (text) {
-          var msg = text;
-          try { msg = JSON.parse(text).error || text; } catch (e) { /* plain-text error */ }
-          throw new Error(msg || "Ollama answered " + res.status);
+          throw new Error(responseError(text, res.status));
         });
       }
       if (!res.body || !res.body.getReader) {
@@ -425,6 +498,7 @@
     available: available,
     get: get,
     baseUrl: baseUrl,
+    apiUrl: apiUrl,
     modelsUrl: modelsUrl,
     headers: headers,
     withQuery: withQuery,
@@ -443,6 +517,10 @@
     ollamaTags: ollamaTags,
     pullOllama: pullOllama,
     ollamaHost: OLLAMA_HOST,
+    probeGateway: probeGateway,
+    gatewayOn: gatewayOn,
+    gatewayInfo: gatewayInfo,
+    usesGateway: usesGateway,
     familyFor: familyFor,
     familyColor: familyColor,
     labelFor: labelFor,

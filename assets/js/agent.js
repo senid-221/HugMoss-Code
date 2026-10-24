@@ -731,13 +731,17 @@
         '<span class="model-group__state ' + stateCls + '">' + state + "</span></div>";
 
       if (ollama.state === "loading") {
-        return html + '<div class="ollama-card ollama-card--quiet"><span class="ollama-spinner"></span>Checking localhost:11434…</div></div>';
+        return html + '<div class="ollama-card ollama-card--quiet"><span class="ollama-spinner"></span>' +
+          (Providers.gatewayOn() ? "Checking Ollama through the gateway…" : "Checking localhost:11434…") + "</div></div>";
       }
       if (ollama.state === "offline") {
-        return html + '<div class="ollama-card">' +
-          "<p><strong>Ollama is not running.</strong> Install it, start it, then retry. " +
-          '<a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a>.</p>' +
-          '<p class="ollama-hint">Start with <code>OLLAMA_ORIGINS=* ollama serve</code> so this page can reach it.</p>' +
+        var offlineBody = Providers.gatewayOn()
+          ? "<p><strong>Ollama is not reachable.</strong> Start it on the gateway host, or set <code>OLLAMA_URL</code> to a running instance.</p>" +
+            '<p class="ollama-hint">The gateway calls Ollama server-side, so <code>OLLAMA_ORIGINS</code> is not required.</p>'
+          : "<p><strong>Ollama is not running.</strong> Install it, start it, then retry. " +
+            '<a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a>.</p>' +
+            '<p class="ollama-hint">Start with <code>OLLAMA_ORIGINS=* ollama serve</code> so this page can reach it.</p>';
+        return html + '<div class="ollama-card">' + offlineBody +
           (ollama.error ? '<p class="ollama-error">' + esc(ollama.error) + "</p>" : "") +
           '<div class="ollama-row"><button class="btn btn--ghost btn--sm" data-ollama-retry>Retry connection</button></div>' +
           "</div></div>";
@@ -862,7 +866,11 @@
       });
       var html = "";
       if (!Providers.configuredCount() && ollama.state === "offline") {
-        html += '<div class="model-pop__notice">Add a cloud provider key to start, or run Ollama locally. HugMoss talks to each provider directly — there is no relay server.</div>';
+        html += '<div class="model-pop__notice">Add a cloud provider key to start, or run Ollama locally. ' +
+          (Providers.gatewayOn()
+            ? "The local gateway relays requests and forwards your key without storing it."
+            : "This page calls each provider directly from your browser.") +
+          "</div>";
       }
       var any = false;
       providers.forEach(function (p) {
