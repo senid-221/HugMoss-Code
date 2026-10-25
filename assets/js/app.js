@@ -1456,6 +1456,7 @@
     { id: "palette.files", label: "Go to File…", hint: "Ctrl+K" },
     { id: "search.view", label: "Search: Find in Files", hint: "Ctrl+Shift+F" },
     { id: "scm.view", label: "Changes: Open Session Changes", hint: "" },
+    { id: "skills.view", label: "Skills: Open NVIDIA Skills", hint: "" },
     { id: "agent.new", label: "Agent: New Session", hint: "" },
     { id: "agent.focus", label: "Agent: Focus Chat", hint: "Alt+A" },
     { id: "agent.model", label: "Agent: Choose Model", hint: "" },
@@ -1565,6 +1566,7 @@
       case "palette.files": openPalette("files", ""); break;
       case "search.view": activateView("search"); break;
       case "scm.view": activateView("scm"); break;
+      case "skills.view": activateView("skills"); break;
       case "agent.new": setAgentOpen(true); if (window.Agent) Agent.newSession(); break;
       case "agent.focus": setAgentOpen(true); syncDrawerChrome(); if (window.Agent) Agent.focusInput(); break;
       case "agent.model": setAgentOpen(true); syncDrawerChrome(); if (window.Agent) Agent.openModelPicker(); break;
@@ -2131,16 +2133,22 @@
     state.view = name;
     $$(".abtn[data-view]").forEach(function (b) { b.classList.toggle("abtn--active", b.getAttribute("data-view") === name); });
     $$(".sidebar__view").forEach(function (v) { v.classList.toggle("sidebar__view--active", v.id === "view-" + name); });
-    var titles = { explorer: "Explorer", search: "Search", scm: "Session Changes", debug: "Run and Debug", extensions: "AI Providers" };
+    var titles = { explorer: "Explorer", search: "Search", scm: "Session Changes", debug: "Run and Debug", extensions: "AI Providers", skills: "NVIDIA Skills" };
     $("#sidebarTitle").textContent = titles[name] || "Explorer";
     if (name === "search") setTimeout(function () { $("#searchInput").focus(); }, 30);
     if (name === "scm") renderScm();
     if (name === "extensions") renderProviderSummary();
-    closeDrawers();
+    if (name === "skills" && window.Skills) {
+      Skills.render();
+      setTimeout(function () { Skills.focusSearch(); }, 30);
+    }
+    if (isDrawer("sidebar") && settings.agentOpen) setAgentOpen(false);
+    syncDrawerChrome();
   }
 
   function setSidebarOpen(open) {
     settings.sidebarOpen = open;
+    if (open && isDrawer("sidebar") && settings.agentOpen) setAgentOpen(false);
     $("#sidebar").classList.toggle("is-hidden", !open);
     $("#sidebarResize").classList.toggle("is-hidden", !open);
     $("#toggleSidebarBtn").classList.toggle("is-on", open);
@@ -2150,6 +2158,7 @@
 
   function setAgentOpen(open) {
     settings.agentOpen = open;
+    if (open && isDrawer("sidebar") && settings.sidebarOpen) setSidebarOpen(false);
     var panel = $("#agentPanel");
     panel.classList.toggle("is-hidden", !open);
     $("#agentResize").classList.toggle("is-hidden", !open);

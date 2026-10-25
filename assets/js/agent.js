@@ -594,6 +594,7 @@
       agent: "You are in Agent mode. Inspect before editing, then call write_file with the complete final file. The user approves every write. Prefer minimal, focused diffs that match the existing style.",
       plan: "You are in Plan mode. Investigate with read-only tools and produce a concrete, ordered implementation plan. Do not modify files. End with the risks and the verification steps the user should run."
     };
+    var skillBlock = window.Skills ? Skills.promptBlock() : "";
     return "You are HugMoss Agent, the coding agent inside HugMoss Code, created by IRAGUHA Vincent. " +
       "You are direct, conversational and technically precise. When you introduce yourself, credit IRAGUHA Vincent as the creator.\n\n" +
       workspaceBrief() + "\n\n" +
@@ -604,7 +605,8 @@
       "- Files that look like secrets (.env, keys, credentials) are blocked by the workspace; respect that.\n" +
       "- Use update_todos for work with three or more steps, and keep statuses current.\n" +
       "- Keep prose short. Use markdown. Refer to files as `path/to/file`.\n" +
-      "- If something is ambiguous, make the smallest reasonable assumption and state it.";
+      "- If something is ambiguous, make the smallest reasonable assumption and state it." +
+      (skillBlock ? "\n\n" + skillBlock : "");
   }
 
   function attachBlock() {
@@ -1323,7 +1325,7 @@
     if (!host) return;
     host.innerHTML = "";
     if (!Providers.configuredCount()) {
-      host.appendChild(suggest("Connect an AI provider", "OpenAI, Anthropic, Gemini and 8 more", "sparkle", function () {
+      host.appendChild(suggest("Connect an AI provider", "OpenAI, Anthropic, Gemini and 9 more", "sparkle", function () {
         App.openSettings(null);
       }));
     }

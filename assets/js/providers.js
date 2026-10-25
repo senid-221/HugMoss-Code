@@ -11,7 +11,7 @@
     openai: "#10a37f", anthropic: "#d97757", google: "#4285f4", xai: "currentColor",
     mistral: "#fa520f", deepseek: "#4d6bfe", groq: "#f55036", together: "#0f6fff",
     openrouter: "#6467f2", perplexity: "#20808d", ollama: "currentColor", meta: "#0866ff",
-    qwen: "#615ced", kimi: "currentColor"
+    qwen: "#615ced", kimi: "currentColor", nvidia: "#76b900"
   };
 
   var GATEWAY = { on: false, info: null, promise: null };
@@ -103,6 +103,24 @@
         ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Llama 3.3 70B Turbo"],
         ["Qwen/Qwen2.5-Coder-32B-Instruct", "Qwen 2.5 Coder 32B"],
         ["deepseek-ai/DeepSeek-V3", "DeepSeek V3"]
+      ]
+    },
+    {
+      id: "nvidia", name: "NVIDIA NIM", kind: "openai", mark: "nvidia", color: COLORS.nvidia,
+      baseUrl: "https://integrate.api.nvidia.com/v1", keyUrl: "https://build.nvidia.com/settings/api-keys",
+      docs: "https://docs.api.nvidia.com/nim/reference/models-1", auth: "bearer", cors: false,
+      note: "Hosted NIM endpoints are OpenAI-compatible. NVIDIA blocks browser origins on these endpoints, so requests go through the local gateway. Keys are forwarded per request and never stored by the gateway.",
+      fallback: [
+        ["nvidia/nemotron-3-super-120b-a12b", "Nemotron 3 Super 120B"],
+        ["nvidia/llama-3.1-nemotron-70b-instruct", "Nemotron 70B"],
+        ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni 30B"],
+        ["nvidia/llama-3.1-nemotron-ultra-253b-v1", "Nemotron Ultra 253B"],
+        ["deepseek-ai/deepseek-v4.1-flash", "DeepSeek V4.1 Flash"],
+        ["moonshotai/kimi-k2.6", "Kimi K2.6"],
+        ["openai/gpt-oss-20b", "GPT-OSS 20B"],
+        ["z-ai/glm-5.3", "GLM 5.3"],
+        ["mistralai/mistral-large-2-instruct", "Mistral Large 2"],
+        ["meta/muse-glimmer-30b", "Muse Glimmer 30B"]
       ]
     },
     {
@@ -236,6 +254,7 @@
 
   function familyFor(model, provider) {
     var s = String(model || "").toLowerCase();
+    if (/nemotron|nvidia\//.test(s)) return "nvidia";
     if (/gpt|chatgpt|^o[1-9](-|$)/.test(s)) return "openai";
     if (/claude/.test(s)) return "claude";
     if (/gemini|gemma/.test(s)) return "gemini";
@@ -260,7 +279,8 @@
       .replace(/\b(\d+)\b/g, "$1")
       .replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); })
       .replace(/\bGpt\b/g, "GPT").replace(/\bOss\b/g, "OSS").replace(/\bAi\b/g, "AI")
-      .replace(/\bLlama\b/g, "Llama");
+      .replace(/\bLlama\b/g, "Llama")
+      .replace(/(\d)([bakm])\b/g, function (m, digit, unit) { return digit + unit.toUpperCase(); });
   }
 
   function ollamaLabel(id) {
@@ -382,6 +402,7 @@
           if (provider.id === "openai") return !/embedding|tts|whisper|dall-e|moderation|image|audio|realtime|transcribe|search|codex-mini/.test(m.id);
           if (provider.id === "mistral") return !/embed|moderation/.test(m.id);
           if (provider.id === "google") return /gemini|gemma/.test(m.id);
+          if (provider.id === "nvidia") return !/embed|rerank|parse|guard|safety|reward|retriever/i.test(m.id);
           if (provider.id === "groq") return !/whisper|tts|guard/.test(m.id);
           if (provider.id === "together") return !/embedding|rerank|vision-free/.test(m.id);
           return true;

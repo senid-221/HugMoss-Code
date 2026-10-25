@@ -65,6 +65,7 @@
         <button class="abtn" data-view="scm" aria-label="Changes" data-tip="Changes"><span class="abtn__icon" data-icon="git"></span><span class="abtn__badge abtn__badge--danger" id="scmBadge" hidden>0</span></button>
         <button class="abtn" data-view="debug" aria-label="Run and Debug" data-tip="Run and Debug"><span class="abtn__icon" data-icon="debug"></span></button>
         <button class="abtn" data-view="extensions" aria-label="Providers" data-tip="Providers"><span class="abtn__icon" data-icon="extensions"></span></button>
+        <button class="abtn" data-view="skills" aria-label="NVIDIA Skills" data-tip="NVIDIA Skills"><span class="abtn__icon" data-icon="skills"></span><span class="abtn__badge" id="skillsBadge" hidden>0</span></button>
       </div>
       <div class="activitybar__group activitybar__group--end">
         <button class="abtn" id="abtnAgent" aria-label="Agent chat" data-tip="Agent (Alt+A)"><span class="abtn__icon" data-icon="sparkle"></span></button>
@@ -146,6 +147,28 @@
           <p>AI providers</p>
           <p class="sideview-empty__sub" id="providerSummary">Connect a provider in Settings to start the agent.</p>
           <button class="btn btn--ghost btn--block" id="providersConfigureBtn">Manage providers</button>
+        </div>
+      </div>
+
+      <div class="sidebar__view" id="view-skills">
+        <div class="skills">
+          <div class="skills__search">
+            <label class="skills__field">
+              <span data-icon="search"></span>
+              <input type="text" id="skillsSearch" placeholder="Search NVIDIA skills" autocomplete="off" spellcheck="false" aria-label="Search NVIDIA skills">
+            </label>
+            <button class="sbtn sbtn--toggle" id="skillsActiveOnly" aria-pressed="false" aria-label="Show active skills only" data-tip="Active only"><span data-icon="check"></span></button>
+          </div>
+          <div class="skills__meta">
+            <span id="skillsSummary">Loading catalog…</span>
+            <button class="linkbtn skills__clear" id="skillsClear" hidden>Clear active</button>
+          </div>
+          <div class="skills__chips" id="skillsChips" role="tablist" aria-label="Skill domains"></div>
+          <div class="skills__list" id="skillsList"></div>
+          <div class="skills__foot">
+            <span>Official NVIDIA Agent Skills · AI &amp; machine learning</span>
+            <span>CC-BY-4.0 AND Apache-2.0 · <a href="https://build.nvidia.com/skills?filters=domain%3Adomain_ai_and_machine_learning" target="_blank" rel="noopener noreferrer">build.nvidia.com/skills</a></span>
+          </div>
         </div>
       </div>
     </aside>
@@ -445,6 +468,8 @@
 <script src="assets/js/fs.js"></script>
 <script src="assets/js/icons.js"></script>
 <script src="assets/js/highlight.js"></script>
+<script src="assets/js/nvidia-skills.js"></script>
+<script src="assets/js/skills.js"></script>
 <script src="assets/js/ai.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/terminal.js"></script>

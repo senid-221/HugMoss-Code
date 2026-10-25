@@ -32,6 +32,7 @@ A browser tab cannot spawn processes, attach a debugger, run a language server, 
 - **Changes** — per-session diffs against the folder baseline, unified diff view, revert a file, save individual files or everything.
 - **Terminal** — multi-session file shell with history, tab completion, syntax colouring and `open`/`download`/`tree` helpers.
 - **Agent** — Ask / Agent / Plan modes, streamed prose, structured todos, expandable tool cards, per-edit approval with inline diffs, stop control, and session history.
+- **NVIDIA Skills** — a searchable catalogue of the official NVIDIA Agent Skills for AI and machine learning. Activate up to six; their real `SKILL.md` instructions are fetched from `NVIDIA/skills` on GitHub and appended to the agent system prompt on the next request.
 - **Workspace chrome** — command palette, menus, settings, provider manager, notifications, toasts, problems panel, status bar, resizable panes, dark and light themes, responsive drawers.
 
 ## Run it
@@ -146,6 +147,7 @@ Keys and preferences live in this browser's `localStorage` only. In gateway mode
 | OpenRouter | `openrouter.ai/api/v1` | Bearer key |
 | Perplexity | `api.perplexity.ai` | Bearer key (chat only, no tools) |
 | Together AI | `api.together.xyz/v1` | Bearer key |
+| NVIDIA NIM | `integrate.api.nvidia.com/v1` | Bearer key (`nvapi-…`); use the gateway, NVIDIA blocks browser origins |
 | Ollama | `localhost:11434` native API (also `/v1`) | No key (local) |
 | Custom endpoint | Any OpenAI-compatible base URL | Optional bearer token (direct mode) |
 
@@ -184,7 +186,26 @@ In direct mode, provider calls originate in your browser, so the provider must a
 
 - **Ollama**: start it with `OLLAMA_ORIGINS=*` so this page can reach `localhost`, or use the gateway.
 - **Anthropic**: direct mode sends `anthropic-dangerous-direct-browser-access: true`, which Anthropic requires for browser calls. The gateway sends the standard server-side auth instead.
+- **NVIDIA NIM**: hosted `integrate.api.nvidia.com` endpoints reject browser origins, so keep the gateway running. A local NIM container can be reached through a custom endpoint instead.
 - **OpenAI, Gemini, xAI, Mistral, DeepSeek, Groq, OpenRouter, Together**: some networks and providers reject browser origins. Run the gateway when a request is blocked.
+
+## NVIDIA Agent Skills
+
+HugMoss ships a browser for the official NVIDIA Agent Skills for AI and machine learning. The catalogue mirrors the AI/ML filter on [build.nvidia.com/skills](https://build.nvidia.com/skills?filters=domain%3Adomain_ai_and_machine_learning): 226 skills across Agentic AI, Training AI, Inference AI, Vision AI, Conversational AI, and Simulation and Modeling.
+
+- Open the graduation-cap icon in the activity bar, or run **Skills: Open NVIDIA Skills** from the command palette.
+- Search by name or description, filter by group or by active skills, and expand a row for its summary, install command, and source link.
+- Activate up to six skills. HugMoss fetches that skill's real `SKILL.md` from the public `NVIDIA/skills` GitHub repository, strips the YAML frontmatter, and caches the body in `localStorage`.
+- On the next agent request, active instruction bodies are appended to the system prompt inside an `<nvidia_skills>` block, capped at 14,000 characters per skill and 24,000 characters in total. If a fetch fails, the skill's catalogue description is sent instead and the row offers **Retry**.
+- The agent still obeys HugMoss's own rules: it cannot run shell commands, and every file write needs your approval, even when a skill describes a CLI workflow.
+
+Skills are published by NVIDIA under `CC-BY-4.0 AND Apache-2.0`. HugMoss is an independent client; use of the catalogue does not imply endorsement by NVIDIA or a partnership. The install buttons copy the upstream command:
+
+```bash
+npx skills add NVIDIA/skills --skill <skill-name>
+```
+
+The catalogue data lives in `assets/js/nvidia-skills.js`; loading, activation, caching, and prompt assembly live in `assets/js/skills.js`.
 
 ## The agent
 
@@ -254,6 +275,8 @@ assets/css/main.css     design tokens, both themes, all component styles
 assets/js/brands.js     official provider and model marks as inline SVG
 assets/img/             HugMoss brand mark, favicons and touch icon
 assets/js/providers.js  provider registry, key storage, model catalogues, gateway routing
+assets/js/nvidia-skills.js  official NVIDIA AI/ML Agent Skills catalogue
+assets/js/skills.js     skills browser, instruction cache, prompt assembly
 assets/js/fs.js         File System Access workspace, fallbacks, diff baselines
 assets/js/ai.js         SSE transport for OpenAI-compatible, Anthropic and Gemini APIs
 assets/js/icons.js      interface and file-type icons
@@ -278,6 +301,7 @@ Everything is plain JavaScript. The gateway uses only Node built-ins. `npm run b
 | `hugmoss.models.v1` | Cached model catalogues (6-hour TTL) |
 | `hugmoss.custom.v1` | Custom endpoint URL and model list |
 | `hugmoss.sessions.v1` | Recent agent sessions |
+| `hugmoss.skills.v1` | Active NVIDIA skills and cached `SKILL.md` bodies |
 | `hugmoss.ide.settings.v2` | Theme, layout, font, wrap and mode preferences |
 
 The last folder handle is stored in IndexedDB (`hugmoss-workspace`) so it can be restored after a reload. Gateway mode is detected at runtime and is not persisted.

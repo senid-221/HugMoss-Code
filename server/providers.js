@@ -12,6 +12,7 @@ const PROVIDERS = Object.freeze({
   groq: { name: "Groq", base: "https://api.groq.com/openai/v1", auth: "bearer" },
   openrouter: { name: "OpenRouter", base: "https://openrouter.ai/api/v1", auth: "bearer", openrouter: true },
   together: { name: "Together AI", base: "https://api.together.xyz/v1", auth: "bearer" },
+  nvidia: { name: "NVIDIA NIM", base: "https://integrate.api.nvidia.com/v1", auth: "bearer" },
   perplexity: { name: "Perplexity", base: "https://api.perplexity.ai", auth: "bearer" },
   ollama: { name: "Ollama", base: OLLAMA_URL + "/v1", auth: "none", local: true }
 });
