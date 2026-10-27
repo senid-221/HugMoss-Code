@@ -2,6 +2,20 @@
 
 const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
 
+const HOSTED_KEY_VARS = Object.freeze({
+  openai: ["OPENAI_API_KEY"],
+  anthropic: ["ANTHROPIC_API_KEY"],
+  google: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+  xai: ["XAI_API_KEY"],
+  mistral: ["MISTRAL_API_KEY"],
+  deepseek: ["DEEPSEEK_API_KEY"],
+  groq: ["GROQ_API_KEY"],
+  openrouter: ["OPENROUTER_API_KEY"],
+  together: ["TOGETHER_API_KEY"],
+  nvidia: ["NVIDIA_API_KEY", "NVIDIA_NIM_API_KEY"],
+  perplexity: ["PERPLEXITY_API_KEY"]
+});
+
 const PROVIDERS = Object.freeze({
   openai: { name: "OpenAI", base: "https://api.openai.com/v1", auth: "bearer" },
   anthropic: { name: "Anthropic", base: "https://api.anthropic.com/v1", auth: "anthropic" },
@@ -21,10 +35,26 @@ function get(id) {
   return Object.prototype.hasOwnProperty.call(PROVIDERS, id) ? PROVIDERS[id] : null;
 }
 
+function hostedKey(id) {
+  const names = HOSTED_KEY_VARS[id];
+  if (!names) return "";
+  for (let i = 0; i < names.length; i += 1) {
+    const value = String(process.env[names[i]] || "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
 function list() {
   return Object.keys(PROVIDERS).map(function (id) {
     const provider = PROVIDERS[id];
-    return { id: id, name: provider.name, keyless: provider.auth === "none", local: !!provider.local };
+    return {
+      id: id,
+      name: provider.name,
+      keyless: provider.auth === "none",
+      local: !!provider.local,
+      hosted: !!hostedKey(id)
+    };
   });
 }
 
@@ -102,6 +132,7 @@ module.exports = {
   list: list,
   get: get,
   requiresKey: requiresKey,
+  hostedKey: hostedKey,
   resolveTarget: resolveTarget,
   upstreamHeaders: upstreamHeaders,
   ollamaUrl: ollamaUrl,

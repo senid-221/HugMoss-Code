@@ -395,8 +395,13 @@
     if (!provider) throw AIError("Unknown provider: " + opts.providerId);
     await Providers.probeGateway();
     if (!opts.model) throw AIError("Choose a model first.");
-    if (!provider.keyless && !opts.apiKey) throw AIError("No API key is configured for " + provider.name + ".");
+    if (!provider.keyless && !opts.apiKey && !(Providers.gatewayOn() && Providers.hosted(provider.id))) {
+      throw AIError("No API key is configured for " + provider.name + ".");
+    }
     if (provider.custom && !Providers.baseUrl(provider)) throw AIError("Set a base URL for your custom endpoint in Settings.");
+    if (provider.cors === false && !Providers.usesGateway(provider)) {
+      throw AIError(provider.name + " blocks direct browser requests. Start the HugMoss gateway with npm start and open the app from its http:// address instead of the HTML file.", 0, provider.name);
+    }
     try {
       if (provider.kind === "anthropic") return await streamAnthropic(provider, opts);
       if (provider.kind === "gemini") return await streamGemini(provider, opts);

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="light dark">
 <title>HugMoss Code</title>
 <link rel="icon" type="image/png" sizes="32x32" href="assets/img/hugmoss-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/img/hugmoss-touch-180.png">
@@ -19,309 +19,475 @@
   <!-- ======================= TITLE BAR ======================= -->
   <header class="titlebar">
     <div class="titlebar__left">
-      <span class="logo" aria-hidden="true">
-        <img src="assets/img/hugmoss-64.png" alt="" width="20" height="20">
-      </span>
-      <span class="wordmark">HugMoss</span>
+      <button class="qbar-icon qbar-icon--boxed" id="qNavToggle" aria-label="Toggle navigation" data-tip="Toggle navigation"><span data-icon="menu"></span></button>
+      <span class="qbar-sep" aria-hidden="true"></span>
+      <button class="qbar-icon" id="qHistoryBack" aria-label="Previous task" data-tip="Previous task" disabled><span data-icon="arrowLeft"></span></button>
+      <button class="qbar-icon" id="qHistoryForward" aria-label="Next task" data-tip="Next task" disabled><span data-icon="arrowRight"></span></button>
       <nav class="menubar" id="menubar" aria-label="Application menu">
         <button class="menubar__item" data-menu="file">File</button>
         <button class="menubar__item" data-menu="edit">Edit</button>
-        <button class="menubar__item" data-menu="selection">Selection</button>
         <button class="menubar__item" data-menu="view">View</button>
-        <button class="menubar__item" data-menu="go">Go</button>
-        <button class="menubar__item" data-menu="run">Run</button>
-        <button class="menubar__item" data-menu="terminal">Terminal</button>
         <button class="menubar__item" data-menu="help">Help</button>
       </nav>
     </div>
-    <div class="titlebar__center">
-      <button class="titlebar-search" id="titleSearch" aria-label="Go to file (Ctrl+K)">
-        <span class="titlebar-search__icon" id="titleSearchIcon"></span>
-        <span class="titlebar-search__text" id="titleSearchText">Search HugMoss</span>
-        <kbd>Ctrl+K</kbd>
-      </button>
-    </div>
     <div class="titlebar__right">
-      <button class="tb-icon" id="toggleSidebarBtn" aria-label="Toggle sidebar (Alt+B)" data-tip="Toggle Sidebar"></button>
-      <button class="tb-icon" id="togglePanelBtn" aria-label="Toggle panel (Alt+J)" data-tip="Toggle Panel"></button>
-      <button class="tb-icon" id="toggleChatBtn" aria-label="Toggle agent chat (Alt+A)" data-tip="Toggle Agent Chat"></button>
-      <button class="tb-icon" id="themeToggle" aria-label="Toggle theme" data-tip="Toggle Theme"></button>
       <div class="win-controls">
-        <button class="win-btn" aria-label="Minimize"><span class="win-btn__min"></span></button>
-        <button class="win-btn" aria-label="Maximize"><span class="win-btn__max"></span></button>
-        <button class="win-btn win-btn--close" aria-label="Close"><span class="win-btn__cls"></span></button>
+        <button class="win-btn" id="qWinMin" aria-label="Focus mode" data-tip="Focus mode"><span class="win-btn__min"></span></button>
+        <button class="win-btn" id="qWinMax" aria-label="Toggle fullscreen" data-tip="Fullscreen"><span class="win-btn__max"></span></button>
+        <button class="win-btn win-btn--close" id="qWinClose" aria-label="Close window" data-tip="Close window"><span class="win-btn__cls"></span></button>
       </div>
     </div>
   </header>
 
-  <!-- ======================= MAIN ======================= -->
-  <div class="main" id="main">
+  <!-- ======================= WORKSPACE ======================= -->
+  <div class="qshell" id="qshell">
 
-    <!-- Activity bar -->
-    <nav class="activitybar" aria-label="Activity bar">
-      <div class="activitybar__group">
-        <button class="abtn abtn--active" data-view="explorer" aria-label="Explorer" data-tip="Explorer"><span class="abtn__icon" data-icon="files"></span></button>
-        <button class="abtn" data-view="search" aria-label="Search" data-tip="Search"><span class="abtn__icon" data-icon="search"></span></button>
-        <button class="abtn" data-view="scm" aria-label="Changes" data-tip="Changes"><span class="abtn__icon" data-icon="git"></span><span class="abtn__badge abtn__badge--danger" id="scmBadge" hidden>0</span></button>
-        <button class="abtn" data-view="debug" aria-label="Run and Debug" data-tip="Run and Debug"><span class="abtn__icon" data-icon="debug"></span></button>
-        <button class="abtn" data-view="extensions" aria-label="Providers" data-tip="Providers"><span class="abtn__icon" data-icon="extensions"></span></button>
-        <button class="abtn" data-view="skills" aria-label="NVIDIA Skills" data-tip="NVIDIA Skills"><span class="abtn__icon" data-icon="skills"></span><span class="abtn__badge" id="skillsBadge" hidden>0</span></button>
+    <!-- Task navigation -->
+    <nav class="qnav" id="qNav" aria-label="Tasks">
+      <div class="qnav__head">
+        <button class="qnav__mode" id="qNavCoding" aria-current="page">
+          <span data-icon="code"></span><span>Coding</span>
+        </button>
+        <button class="qnav__mode-aux" id="qNavSpec" aria-label="Start a task with the agent" data-tip="Agent task"><span data-icon="sparkle"></span></button>
       </div>
-      <div class="activitybar__group activitybar__group--end">
-        <button class="abtn" id="abtnAgent" aria-label="Agent chat" data-tip="Agent (Alt+A)"><span class="abtn__icon" data-icon="sparkle"></span></button>
-        <button class="abtn abtn--avatar" id="abtnAccount" aria-label="About HugMoss" data-tip="HugMoss Code"><span class="avatar">HM</span></button>
-        <button class="abtn" id="abtnSettings" aria-label="Settings" data-tip="Settings"><span class="abtn__icon" data-icon="gear"></span></button>
+
+      <div class="qnav__actions">
+        <button class="qnav__row" id="qNewTask"><span class="qnav__row-icon" data-icon="newTask"></span><span>New Task</span></button>
+        <button class="qnav__row" id="qSearch"><span class="qnav__row-icon" data-icon="search"></span><span>Search</span></button>
+      </div>
+
+      <div class="qnav__search" id="qNavSearchWrap" hidden>
+        <span data-icon="search"></span>
+        <input type="text" id="qNavSearch" placeholder="Filter tasks" autocomplete="off" spellcheck="false" aria-label="Filter recent tasks">
+        <button id="qNavSearchClose" aria-label="Close search"><span data-icon="close"></span></button>
+      </div>
+
+      <div class="qnav__section">
+        <div class="qnav__section-head">
+          <span>Workspaces</span>
+          <button id="qNewWorkspace" aria-label="Open a folder" data-tip="Open folder"><span data-icon="plus"></span></button>
+        </div>
+        <div class="qnav__workspaces" id="qWorkspaces"></div>
+      </div>
+
+      <div class="qnav__section qnav__section--grow">
+        <div class="qnav__section-head"><span>Recent tasks</span></div>
+        <div class="qnav__tasks" id="qTasks"></div>
+      </div>
+
+      <div class="qnav__links">
+        <button class="qnav__row" id="qKnowledge"><span class="qnav__row-icon" data-icon="bookOpen"></span><span>Knowledge Center</span></button>
+        <button class="qnav__row" id="qSites"><span class="qnav__row-icon" data-icon="window"></span><span>Sites</span></button>
+        <button class="qnav__row" id="qAutomations"><span class="qnav__row-icon" data-icon="clock"></span><span>Automations</span></button>
+        <button class="qnav__row" id="qExtensions"><span class="qnav__row-icon" data-icon="extensions"></span><span>Extensions</span></button>
+      </div>
+
+      <div class="qnav__foot">
+        <button class="qnav__user" id="qUser">
+          <span class="qnav__avatar" aria-hidden="true">V</span>
+          <span class="qnav__user-name">Vincent</span>
+        </button>
+        <div class="qnav__foot-actions">
+          <button id="qExport" aria-label="Export the current session" data-tip="Export session"><span data-icon="download"></span></button>
+          <button id="qHelp" aria-label="Help" data-tip="Help"><span data-icon="helpCircle"></span></button>
+          <button id="qSettings" aria-label="Settings" data-tip="Settings"><span data-icon="gear"></span></button>
+        </div>
       </div>
     </nav>
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
-      <div class="sidebar__head"><h2 class="sidebar__title" id="sidebarTitle">Explorer</h2></div>
-
-      <div class="sidebar__view sidebar__view--active" id="view-explorer">
-        <div class="treesection">
-          <div class="treesection__head">
-            <button class="treesection__toggle" id="projectToggle" aria-label="Toggle project section"><span class="chev chev--open" data-icon="chevron"></span><span id="projectLabel">NO FOLDER OPEN</span></button>
-            <div class="treesection__actions">
-              <button class="sbtn" id="openFolderBtn" aria-label="Open Folder" data-tip="Open Folder"><span data-icon="folderOpen"></span></button>
-              <button class="sbtn" id="newFileBtn" aria-label="New File" data-tip="New File"><span data-icon="newfile"></span></button>
-              <button class="sbtn" id="newFolderBtn" aria-label="New Folder" data-tip="New Folder"><span data-icon="newfolder"></span></button>
-              <button class="sbtn" id="refreshBtn" aria-label="Refresh Explorer" data-tip="Rescan Folder"><span data-icon="refresh"></span></button>
-              <button class="sbtn" id="collapseBtn" aria-label="Collapse Folders" data-tip="Collapse Folders"><span data-icon="collapse"></span></button>
-            </div>
+    <!-- Agent chat -->
+    <main class="qmain" id="qMain">
+      <aside class="agent" id="agentPanel" aria-label="Agent chat">
+        <div class="agent__head">
+          <div class="agent__head-titles">
+            <span class="agent__session" id="agentSessionName">New session</span>
+            <button class="head-icon head-icon--more" id="agentMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Session menu" data-tip="More"><span data-icon="more"></span></button>
           </div>
-          <div class="tree" id="fileTree" role="tree"></div>
-        </div>
-        <div class="treesection">
-          <div class="treesection__head">
-            <button class="treesection__toggle" id="outlineToggle" aria-label="Toggle outline"><span class="chev chev--open" data-icon="chevron"></span>OUTLINE</button>
-          </div>
-          <div class="tree tree--sub" id="outlineTree"></div>
-        </div>
-        <div class="treesection">
-          <div class="treesection__head">
-            <button class="treesection__toggle" id="timelineToggle" aria-label="Toggle timeline"><span class="chev chev--open" data-icon="chevron"></span>TIMELINE</button>
-          </div>
-          <div class="tree tree--sub" id="timelineTree"></div>
-        </div>
-      </div>
-
-      <div class="sidebar__view" id="view-search">
-        <div class="searchbar">
-          <div class="searchbar__row">
-            <input type="text" id="searchInput" placeholder="Search folder" autocomplete="off" spellcheck="false" aria-label="Search folder">
-            <div class="searchbar__toggles">
-              <button class="stg" id="searchCase" aria-label="Match case" data-tip="Match Case">Aa</button>
-              <button class="stg" id="searchWord" aria-label="Match whole word" data-tip="Match Whole Word">ab</button>
-              <button class="stg" id="searchRegex" aria-label="Use regular expression" data-tip="Use Regular Expression">.*</button>
-            </div>
-          </div>
-        </div>
-        <div class="search-results" id="searchResults"></div>
-        <div class="search-footer" id="searchFooter"></div>
-      </div>
-
-      <div class="sidebar__view" id="view-scm">
-        <div class="scm">
-          <div class="scm__head">
-            <span class="sidebar__title" id="scmTitle">Changes</span>
-            <button class="sbtn" id="scmRevertAllBtn" aria-label="Revert all session changes" data-tip="Revert All"><span data-icon="history"></span></button>
-          </div>
-          <p class="scm__note">Session edits compared with the folder when it was opened. HugMoss does not run git; commit with your own tooling.</p>
-          <div class="scm__changes-head">CHANGES <span class="count-badge" id="scmCount">0</span></div>
-          <div class="scm__list" id="scmList"></div>
-        </div>
-      </div>
-
-      <div class="sidebar__view" id="view-debug">
-        <div class="sideview-empty">
-          <span data-icon="debug"></span>
-          <p>Run and Debug</p>
-          <p class="sideview-empty__sub">A browser tab cannot attach to local processes. Run your app in a real terminal and use the DevTools of this tab for the editor itself.</p>
-        </div>
-      </div>
-
-      <div class="sidebar__view" id="view-extensions">
-        <div class="sideview-empty">
-          <span data-icon="extensions"></span>
-          <p>AI providers</p>
-          <p class="sideview-empty__sub" id="providerSummary">Connect a provider in Settings to start the agent.</p>
-          <button class="btn btn--ghost btn--block" id="providersConfigureBtn">Manage providers</button>
-        </div>
-      </div>
-
-      <div class="sidebar__view" id="view-skills">
-        <div class="skills">
-          <div class="skills__search">
-            <label class="skills__field">
-              <span data-icon="search"></span>
-              <input type="text" id="skillsSearch" placeholder="Search NVIDIA skills" autocomplete="off" spellcheck="false" aria-label="Search NVIDIA skills">
-            </label>
-            <button class="sbtn sbtn--toggle" id="skillsActiveOnly" aria-pressed="false" aria-label="Show active skills only" data-tip="Active only"><span data-icon="check"></span></button>
-          </div>
-          <div class="skills__meta">
-            <span id="skillsSummary">Loading catalog…</span>
-            <button class="linkbtn skills__clear" id="skillsClear" hidden>Clear active</button>
-          </div>
-          <div class="skills__chips" id="skillsChips" role="tablist" aria-label="Skill domains"></div>
-          <div class="skills__list" id="skillsList"></div>
-          <div class="skills__foot">
-            <span>Official NVIDIA Agent Skills · AI &amp; machine learning</span>
-            <span>CC-BY-4.0 AND Apache-2.0 · <a href="https://build.nvidia.com/skills?filters=domain%3Adomain_ai_and_machine_learning" target="_blank" rel="noopener noreferrer">build.nvidia.com/skills</a></span>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <div class="handle handle--col" id="sidebarResize" role="separator" aria-label="Resize sidebar"></div>
-
-    <!-- Editor column -->
-    <div class="editor-col" id="editorCol">
-      <div class="tabstrip" id="tabstrip" role="tablist"></div>
-      <div class="breadcrumbs" id="breadcrumbs"></div>
-
-      <div class="code-wrap" id="codeWrap">
-        <div class="code-scroll" id="codeScroll">
-          <div class="code-lines" id="codeLines"></div>
-        </div>
-        <div class="diff-view" id="diffView" hidden>
-          <div class="diff-view__head" id="diffHead"></div>
-          <div class="diff-view__body" id="diffBody"></div>
-        </div>
-        <div class="welcome" id="welcomeView" hidden>
-          <div class="welcome__inner">
-            <div class="welcome__logo" aria-hidden="true">
-              <img src="assets/img/hugmoss-128.png" alt="" width="56" height="56">
-            </div>
-            <h1 class="welcome__title" id="welcomeTitle">HugMoss Code</h1>
-            <p class="welcome__sub" id="welcomeSub">A browser IDE with a real folder and a real agent.</p>
-            <div class="welcome__cta" id="welcomeCta"></div>
-            <div class="welcome__shortcuts">
-              <button class="wshort" data-action="open"><span>Open Folder…</span><kbd>Ctrl+O</kbd></button>
-              <button class="wshort" data-action="file"><span>Go to File</span><kbd>Ctrl+K</kbd></button>
-              <button class="wshort" data-action="terminal"><span>Toggle Terminal</span><kbd>Alt+J</kbd></button>
-            </div>
-            <button class="welcome__agent" id="welcomeAgentCard">
-              <span class="welcome__agent-icon" data-icon="sparkle"></span>
-              <span class="welcome__agent-text"><strong>Ask the Agent</strong><em>Reads, searches, writes files with your approval — using your own API key</em></span>
-              <span class="welcome__agent-arrow" data-icon="chevron"></span>
+          <div class="agent__head-actions">
+            <button class="ws-chip" id="agentWorkspaceBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Workspace" data-tip="Workspace">
+              <span class="ws-chip__icon" data-icon="folder"></span>
+              <span class="ws-chip__chev" data-icon="chevronDown"></span>
             </button>
+            <button class="head-icon" id="agentQuickBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Quick actions" data-tip="Quick actions"><span data-icon="zap"></span></button>
+            <button class="head-icon" id="agentTodosBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Plan" data-tip="Plan"><span data-icon="listTodo"></span></button>
           </div>
         </div>
-        <div class="minimap" id="minimap" aria-hidden="true">
-          <canvas id="minimapCanvas"></canvas>
-          <div class="minimap__vp" id="minimapVp"></div>
-        </div>
-      </div>
-
-      <div class="handle handle--row" id="panelResize" role="separator" aria-label="Resize panel"></div>
-
-      <!-- Bottom panel -->
-      <div class="panel" id="bottomPanel">
-        <div class="panel__head">
-          <div class="ptabs" role="tablist">
-            <button class="ptab" data-panel="problems" role="tab">PROBLEMS <span class="ptab__badge" id="problemsBadge">0</span></button>
-            <button class="ptab" data-panel="output" role="tab">OUTPUT</button>
-            <button class="ptab ptab--active" data-panel="terminal" role="tab">TERMINAL</button>
-          </div>
-          <div class="panel__actions">
-            <button class="sbtn" id="panelKillBtn" aria-label="Kill terminal" data-tip="Kill Terminal"><span data-icon="trash"></span></button>
-            <button class="sbtn" id="panelCollapseBtn" aria-label="Collapse panel" data-tip="Collapse Panel"><span data-icon="chevronDown"></span></button>
+        <div class="agent__stream" id="agentStream">
+          <div class="agent__empty" id="agentEmpty">
+            <div class="agent__empty-mark" aria-hidden="true"><img src="assets/img/hugmoss-128.png" alt="" width="42" height="42"></div>
+            <h3 class="agent__empty-title">Hi Vincent, I&rsquo;m your coding agent</h3>
+            <p class="agent__empty-credit">Built by IRAGUHA Vincent</p>
+            <div class="agent__suggestions" id="agentSuggestions"></div>
           </div>
         </div>
-        <div class="panel__body">
-          <div class="pview" id="pview-problems" hidden></div>
-          <div class="pview pview--output" id="pview-output" hidden></div>
-          <div class="pview pview--term" id="pview-terminal">
-            <div class="term__tabs">
-              <div class="term__tablist" id="termTablist"></div>
-              <div class="term__tabs-actions">
-                <button class="sbtn" id="termAddBtn" aria-label="New terminal" data-tip="New Terminal"><span data-icon="plus"></span></button>
-                <button class="sbtn" id="termTrashBtn" aria-label="Delete terminal" data-tip="Delete Terminal"><span data-icon="trash"></span></button>
+        <button class="agent__jump" id="agentJump" hidden>↓ Jump to latest</button>
+        <div class="agent__composer">
+          <div class="ctx-chips" id="ctxChips"></div>
+          <div class="composer__card">
+            <textarea id="agentInput" rows="1" placeholder="Describe a task, or ask a question…" spellcheck="false" aria-label="Message the agent"></textarea>
+            <div class="composer__row">
+              <div class="composer__left">
+                <button class="comp-btn comp-btn--round" id="agentAddBtn" aria-label="Add context" data-tip="Add context"><span data-icon="plus"></span></button>
+                <button class="comp-btn comp-btn--plain" id="attachBtn" aria-label="Attach the open file" data-tip="Attach file"><span data-icon="paperclip"></span></button>
+                <button class="mode-picker" id="agentModeBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Agent mode">
+                  <span class="mode-picker__icon" data-icon="shield" aria-hidden="true"></span>
+                  <span class="mode-picker__label" id="agentModeLabel">Agent</span>
+                  <span class="mode-picker__chev" data-icon="chevronDown"></span>
+                </button>
+              </div>
+              <div class="composer__right">
+                <button class="comp-btn comp-btn--plain" id="micBtn" aria-label="Dictate" aria-pressed="false" data-tip="Dictate"><span data-icon="mic"></span></button>
+                <button class="model-picker" id="modelBtn" aria-haspopup="menu">
+                  <span class="model-picker__logo" id="modelLogo" aria-hidden="true"></span>
+                  <span id="modelName">Choose model</span>
+                  <span class="model-picker__chev" data-icon="chevronDown"></span>
+                </button>
+                <button class="send-btn" id="sendBtn" aria-label="Send message" disabled><span data-icon="send"></span></button>
               </div>
             </div>
-            <div class="term__body" id="termBody" tabindex="0">
-              <div class="term__lines" id="termLines"></div>
-              <div class="term__prompt-line" id="termPromptLine">
-                <span class="term__arrow">➜</span><span class="term__cwd" id="termCwd">~</span>
-                <span class="term__input-mirror" id="termMirror"></span><span class="term__cursor" id="termCursor"></span>
-              </div>
+          </div>
+          <div class="composer__local">
+            <span class="composer__local-scope"><span data-icon="monitor"></span>Local</span>
+            <span class="composer__meter" id="ctxMeter">
+              <span class="composer__meter-track"><span class="composer__meter-fill" id="ctxMeterFill"></span></span>
+              <span class="composer__meter-icon" data-icon="target"></span>
+              <span class="composer__meter-label" id="ctxMeterLabel">0%</span>
+            </span>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Browser -->
+    <aside class="qbrowser" id="qBrowser" aria-label="Browser">
+      <div class="qbrowser__tabs">
+        <button class="qbtab is-active" id="qBrowserTab" aria-current="page">
+          <span data-icon="globe"></span><span>Browser</span>
+        </button>
+        <div class="qbrowser__tabs-actions">
+          <button id="qBNewTab" aria-label="New tab" data-tip="New tab"><span data-icon="plus"></span></button>
+          <button id="qBExpand" aria-label="Expand browser" aria-pressed="false" data-tip="Expand"><span data-icon="expand"></span></button>
+          <button id="qBSplit" aria-label="Widen browser" aria-pressed="false" data-tip="Widen"><span data-icon="split"></span></button>
+          <button id="qBPanel" aria-label="Close browser" data-tip="Close browser"><span data-icon="panelRight"></span></button>
+        </div>
+      </div>
+      <div class="qbrowser__bar">
+        <button class="qbar-icon qbar-icon--sm" id="qBBack" aria-label="Back" data-tip="Back" disabled><span data-icon="chevronLeft"></span></button>
+        <button class="qbar-icon qbar-icon--sm" id="qBForward" aria-label="Forward" data-tip="Forward" disabled><span data-icon="chevron"></span></button>
+        <button class="qbar-icon qbar-icon--sm" id="qBReload" aria-label="Reload" data-tip="Reload" disabled><span data-icon="refresh"></span></button>
+        <form class="qurl" id="qUrlForm" autocomplete="off">
+          <span data-icon="globe" aria-hidden="true"></span>
+          <input type="text" id="qUrl" placeholder="Enter a URL" spellcheck="false" aria-label="Browser address">
+        </form>
+        <button class="qbar-icon qbar-icon--sm" id="qBDevice" aria-label="Mobile preview" aria-pressed="false" data-tip="Mobile preview"><span data-icon="scan"></span></button>
+        <button class="qbar-icon qbar-icon--sm" id="qBOpen" aria-label="Open in a new tab" data-tip="Open in new tab" disabled><span data-icon="external"></span></button>
+        <button class="qbar-icon qbar-icon--sm" id="qBCopy" aria-label="Copy address" data-tip="Copy address" disabled><span data-icon="link"></span></button>
+        <button class="qbar-icon qbar-icon--sm" id="qBMore" aria-label="More browser actions" aria-haspopup="menu" aria-expanded="false"><span data-icon="more"></span></button>
+      </div>
+      <div class="qbrowser__pagetab" id="qPageTab" hidden>
+        <span data-icon="globe" aria-hidden="true"></span>
+        <span id="qPageTitle">HugMoss Code</span>
+      </div>
+      <div class="qbrowser__view" id="qBrowserView">
+        <iframe id="qFrame" title="Browser preview" src="about:blank"></iframe>
+        <div class="qbrowser__start" id="qStart">
+          <div class="qstart">
+            <img src="assets/img/hugmoss-128.png" alt="" width="44" height="44">
+            <h3>Browser</h3>
+            <p>Preview your local app or open any address in this pane.</p>
+            <form class="qstart__field" id="qStartForm" autocomplete="off">
+              <span data-icon="globe" aria-hidden="true"></span>
+              <input type="text" id="qStartUrl" placeholder="Type a URL and press Enter" spellcheck="false" aria-label="Open a URL">
+            </form>
+            <div class="qstart__grid">
+              <button class="qstart__card" id="qStartApp" data-open="app">
+                <span data-icon="monitor" aria-hidden="true"></span>
+                <b>Local app</b>
+                <em id="qStartAppHost">This HugMoss session</em>
+              </button>
+              <button class="qstart__card" id="qStartRepo" data-open="repo">
+                <span data-icon="branch" aria-hidden="true"></span>
+                <b>Repository</b>
+                <em>github.com/senid-221</em>
+              </button>
             </div>
-            <input id="termInput" class="term__hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal input">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="handle handle--col" id="agentResize" role="separator" aria-label="Resize agent panel"></div>
-
-    <!-- Agent panel -->
-    <aside class="agent" id="agentPanel" aria-label="Agent chat">
-      <div class="agent__head">
-        <div class="agent__head-titles">
-          <h2>Agent</h2><span class="agent__session" id="agentSessionName">New session</span>
-        </div>
-        <div class="agent__head-actions">
-          <button class="sbtn" id="agentHistoryBtn" aria-label="Session history" data-tip="History"><span data-icon="history"></span></button>
-          <button class="sbtn" id="agentNewChatBtn" aria-label="New chat" data-tip="New Chat"><span data-icon="plus"></span></button>
-          <button class="sbtn" id="agentCloseBtn" aria-label="Close agent panel" data-tip="Close"><span data-icon="close"></span></button>
-        </div>
-      </div>
-      <div class="agent__stream" id="agentStream">
-        <div class="agent__empty" id="agentEmpty">
-          <div class="agent__empty-mark" aria-hidden="true"><img src="assets/img/hugmoss-128.png" alt="" width="42" height="42"></div>
-          <h3 class="agent__empty-title">Hi Vincent, I&rsquo;m your coding agent</h3>
-          <p class="agent__empty-credit">Built by IRAGUHA Vincent</p>
-          <div class="agent__suggestions" id="agentSuggestions"></div>
-        </div>
-      </div>
-      <button class="agent__jump" id="agentJump" hidden>↓ Jump to latest</button>
-      <div class="agent__composer">
-        <div class="ctx-chips" id="ctxChips"></div>
-        <textarea id="agentInput" rows="1" placeholder="Ask anything, or describe a task… (@ to mention files)" spellcheck="false" aria-label="Message the agent"></textarea>
-        <div class="composer__row">
-          <div class="mode-pills" role="tablist" aria-label="Agent mode">
-            <button class="mpill" data-mode="ask" role="tab">Ask</button>
-            <button class="mpill mpill--active" data-mode="agent" role="tab">Agent</button>
-            <button class="mpill" data-mode="plan" role="tab">Plan</button>
-          </div>
-          <div class="composer__right">
-            <button class="model-picker" id="modelBtn" aria-haspopup="menu">
-              <span class="model-picker__logo" id="modelLogo" aria-hidden="true"></span>
-              <span id="modelName">Choose model</span>
-              <span class="model-picker__chev" data-icon="chevronDown"></span>
-            </button>
-            <button class="send-btn" id="sendBtn" aria-label="Send message" disabled><span data-icon="send"></span></button>
           </div>
         </div>
       </div>
     </aside>
   </div>
 
-  <!-- ======================= STATUS BAR ======================= -->
-  <footer class="statusbar">
-    <div class="statusbar__left">
-      <button class="sb-item sb-item--accent" id="sbWorkspace" aria-label="Open or close folder">
-        <span data-icon="folder"></span><span id="sbWorkspaceName">No folder</span>
-      </button>
-      <button class="sb-item" id="sbChanges" aria-label="Session changes">
-        <span data-icon="git"></span><span id="sbChangeCount">0</span>
-      </button>
-      <button class="sb-item" id="sbProblems" aria-label="Problems"><span class="sb-ico sb-ico--err" data-icon="errorCircle"></span><span id="sbErrCount">0</span><span class="sb-ico sb-ico--warn" data-icon="warning"></span><span id="sbWarnCount">0</span></button>
+  <div class="qeditor" id="qEditor" hidden>
+    <div class="qeditor__bar">
+      <button class="qeditor__back" id="qEditorBack"><span data-icon="arrowLeft"></span><span>Task</span></button>
+      <span class="qeditor__title" id="qEditorTitle">Editor</span>
+      <button class="qbar-icon qbar-icon--sm" id="qEditorClose" aria-label="Close editor"><span data-icon="close"></span></button>
     </div>
-    <div class="statusbar__right">
-      <button class="sb-item" id="sbReadonly" hidden>Read-only</button>
-      <button class="sb-item" id="sbCursor">Ln 1, Col 1</button>
-      <button class="sb-item" id="sbIndent">Spaces: 2</button>
-      <button class="sb-item" id="sbEncoding">UTF-8</button>
-      <button class="sb-item" id="sbEol">LF</button>
-      <button class="sb-item" id="sbLang">Plain Text</button>
-      <button class="sb-item" id="sbBell" aria-label="Notifications"><span data-icon="bell"></span></button>
+    <div class="qeditor__host" id="qEditorHost"></div>
+  </div>
+
+  <!-- ======================= LEGACY IDE (hidden, keeps commands wired) ======================= -->
+  <div class="legacy-ide" id="legacyIde" hidden>
+    <div class="legacy-toolbar">
+      <button class="titlebar-search" id="titleSearch" aria-label="Go to file (Ctrl+K)">
+        <span class="titlebar-search__icon" id="titleSearchIcon"></span>
+        <span class="titlebar-search__text" id="titleSearchText">Search HugMoss</span>
+        <kbd>Ctrl+K</kbd>
+      </button>
+      <button class="tb-icon" id="toggleSidebarBtn" aria-label="Toggle sidebar (Alt+B)" data-tip="Toggle Sidebar"></button>
+      <button class="tb-icon" id="togglePanelBtn" aria-label="Toggle panel (Alt+J)" data-tip="Toggle Panel"></button>
+      <button class="tb-icon" id="toggleChatBtn" aria-label="Toggle agent chat (Alt+A)" data-tip="Toggle Agent Chat"></button>
+      <button class="tb-icon" id="themeToggle" aria-label="Toggle theme" data-tip="Toggle Theme"></button>
     </div>
-  </footer>
+
+    <div class="main" id="main">
+      <nav class="activitybar" aria-label="Activity bar">
+        <div class="activitybar__group">
+          <button class="abtn abtn--active" data-view="explorer" aria-label="Explorer" data-tip="Explorer"><span class="abtn__icon" data-icon="files"></span></button>
+          <button class="abtn" data-view="search" aria-label="Search" data-tip="Search"><span class="abtn__icon" data-icon="search"></span></button>
+          <button class="abtn" data-view="scm" aria-label="Changes" data-tip="Changes"><span class="abtn__icon" data-icon="git"></span><span class="abtn__badge abtn__badge--danger" id="scmBadge" hidden>0</span></button>
+          <button class="abtn" data-view="debug" aria-label="Run and Debug" data-tip="Run and Debug"><span class="abtn__icon" data-icon="debug"></span></button>
+          <button class="abtn" data-view="extensions" aria-label="Providers" data-tip="Providers"><span class="abtn__icon" data-icon="extensions"></span></button>
+          <button class="abtn" data-view="skills" aria-label="NVIDIA Skills" data-tip="NVIDIA Skills"><span class="abtn__icon" data-icon="skills"></span><span class="abtn__badge" id="skillsBadge" hidden>0</span></button>
+        </div>
+        <div class="activitybar__group activitybar__group--end">
+          <button class="abtn" id="abtnAgent" aria-label="Agent chat" data-tip="Agent (Alt+A)"><span class="abtn__icon" data-icon="sparkle"></span></button>
+          <button class="abtn abtn--avatar" id="abtnAccount" aria-label="About HugMoss" data-tip="HugMoss Code"><span class="avatar">HM</span></button>
+          <button class="abtn" id="abtnSettings" aria-label="Settings" data-tip="Settings"><span class="abtn__icon" data-icon="gear"></span></button>
+        </div>
+      </nav>
+
+      <div id="legacySidebarHost">
+        <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+          <div class="sidebar__head"><h2 class="sidebar__title" id="sidebarTitle">Explorer</h2></div>
+
+          <div class="sidebar__view sidebar__view--active" id="view-explorer">
+            <div class="treesection">
+              <div class="treesection__head">
+                <button class="treesection__toggle" id="projectToggle" aria-label="Toggle project section"><span class="chev chev--open" data-icon="chevron"></span><span id="projectLabel">NO FOLDER OPEN</span></button>
+                <div class="treesection__actions">
+                  <button class="sbtn" id="openFolderBtn" aria-label="Open Folder" data-tip="Open Folder"><span data-icon="folderOpen"></span></button>
+                  <button class="sbtn" id="newFileBtn" aria-label="New File" data-tip="New File"><span data-icon="newfile"></span></button>
+                  <button class="sbtn" id="newFolderBtn" aria-label="New Folder" data-tip="New Folder"><span data-icon="newfolder"></span></button>
+                  <button class="sbtn" id="refreshBtn" aria-label="Refresh Explorer" data-tip="Rescan Folder"><span data-icon="refresh"></span></button>
+                  <button class="sbtn" id="collapseBtn" aria-label="Collapse Folders" data-tip="Collapse Folders"><span data-icon="collapse"></span></button>
+                </div>
+              </div>
+              <div class="tree" id="fileTree" role="tree"></div>
+            </div>
+            <div class="treesection">
+              <div class="treesection__head">
+                <button class="treesection__toggle" id="outlineToggle" aria-label="Toggle outline"><span class="chev chev--open" data-icon="chevron"></span>OUTLINE</button>
+              </div>
+              <div class="tree tree--sub" id="outlineTree"></div>
+            </div>
+            <div class="treesection">
+              <div class="treesection__head">
+                <button class="treesection__toggle" id="timelineToggle" aria-label="Toggle timeline"><span class="chev chev--open" data-icon="chevron"></span>TIMELINE</button>
+              </div>
+              <div class="tree tree--sub" id="timelineTree"></div>
+            </div>
+          </div>
+
+          <div class="sidebar__view" id="view-search">
+            <div class="searchbar">
+              <div class="searchbar__row">
+                <input type="text" id="searchInput" placeholder="Search folder" autocomplete="off" spellcheck="false" aria-label="Search folder">
+                <div class="searchbar__toggles">
+                  <button class="stg" id="searchCase" aria-label="Match case" data-tip="Match Case">Aa</button>
+                  <button class="stg" id="searchWord" aria-label="Match whole word" data-tip="Match Whole Word">ab</button>
+                  <button class="stg" id="searchRegex" aria-label="Use regular expression" data-tip="Use Regular Expression">.*</button>
+                </div>
+              </div>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+            <div class="search-footer" id="searchFooter"></div>
+          </div>
+
+          <div class="sidebar__view" id="view-scm">
+            <div class="scm">
+              <div class="scm__head">
+                <span class="sidebar__title" id="scmTitle">Changes</span>
+                <button class="sbtn" id="scmRevertAllBtn" aria-label="Revert all session changes" data-tip="Revert All"><span data-icon="history"></span></button>
+              </div>
+              <p class="scm__note">Session edits compared with the folder when it was opened. HugMoss does not run git; commit with your own tooling.</p>
+              <div class="scm__changes-head">CHANGES <span class="count-badge" id="scmCount">0</span></div>
+              <div class="scm__list" id="scmList"></div>
+            </div>
+          </div>
+
+          <div class="sidebar__view" id="view-debug">
+            <div class="sideview-empty">
+              <span data-icon="debug"></span>
+              <p>Run and Debug</p>
+              <p class="sideview-empty__sub">A browser tab cannot attach to local processes. Run your app in a real terminal and use the DevTools of this tab for the editor itself.</p>
+            </div>
+          </div>
+
+          <div class="sidebar__view" id="view-extensions">
+            <div class="sideview-empty">
+              <span data-icon="extensions"></span>
+              <p>AI providers</p>
+              <p class="sideview-empty__sub" id="providerSummary">Connect a provider in Settings to start the agent.</p>
+              <button class="btn btn--ghost btn--block" id="providersConfigureBtn">Manage providers</button>
+            </div>
+          </div>
+
+          <div class="sidebar__view" id="view-skills">
+            <div class="skills">
+              <div class="skills__search">
+                <label class="skills__field">
+                  <span data-icon="search"></span>
+                  <input type="text" id="skillsSearch" placeholder="Search NVIDIA skills" autocomplete="off" spellcheck="false" aria-label="Search NVIDIA skills">
+                </label>
+                <button class="sbtn sbtn--toggle" id="skillsActiveOnly" aria-pressed="false" aria-label="Show active skills only" data-tip="Active only"><span data-icon="check"></span></button>
+              </div>
+              <div class="skills__meta">
+                <span id="skillsSummary">Loading catalog…</span>
+                <button class="linkbtn skills__clear" id="skillsClear" hidden>Clear active</button>
+              </div>
+              <div class="skills__chips" id="skillsChips" role="tablist" aria-label="Skill domains"></div>
+              <div class="skills__list" id="skillsList"></div>
+              <div class="skills__foot">
+                <span>Official NVIDIA Agent Skills · AI &amp; machine learning</span>
+                <span>CC-BY-4.0 AND Apache-2.0 · <a href="https://build.nvidia.com/skills?filters=domain%3Adomain_ai_and_machine_learning" target="_blank" rel="noopener noreferrer">build.nvidia.com/skills</a></span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="handle handle--col" id="sidebarResize" role="separator" aria-label="Resize sidebar"></div>
+
+      <div class="editor-col" id="editorCol">
+        <div class="tabstrip" id="tabstrip" role="tablist"></div>
+        <div class="breadcrumbs" id="breadcrumbs"></div>
+
+        <div class="code-wrap" id="codeWrap">
+          <div class="code-scroll" id="codeScroll">
+            <div class="code-lines" id="codeLines"></div>
+          </div>
+          <div class="diff-view" id="diffView" hidden>
+            <div class="diff-view__head" id="diffHead"></div>
+            <div class="diff-view__body" id="diffBody"></div>
+          </div>
+          <div class="welcome" id="welcomeView" hidden>
+            <div class="welcome__inner">
+              <div class="welcome__logo" aria-hidden="true">
+                <img src="assets/img/hugmoss-128.png" alt="" width="56" height="56">
+              </div>
+              <h1 class="welcome__title" id="welcomeTitle">HugMoss Code</h1>
+              <p class="welcome__sub" id="welcomeSub">A browser IDE with a real folder and a real agent.</p>
+              <div class="welcome__cta" id="welcomeCta"></div>
+              <div class="welcome__shortcuts">
+                <button class="wshort" data-action="open"><span>Open Folder…</span><kbd>Ctrl+O</kbd></button>
+                <button class="wshort" data-action="file"><span>Go to File</span><kbd>Ctrl+K</kbd></button>
+                <button class="wshort" data-action="terminal"><span>Toggle Terminal</span><kbd>Alt+J</kbd></button>
+              </div>
+              <button class="welcome__agent" id="welcomeAgentCard">
+                <span class="welcome__agent-icon" data-icon="sparkle"></span>
+                <span class="welcome__agent-text"><strong>Ask the Agent</strong><em>Reads, searches, writes files with your approval — powered by the provider you choose</em></span>
+                <span class="welcome__agent-arrow" data-icon="chevron"></span>
+              </button>
+            </div>
+          </div>
+          <div class="minimap" id="minimap" aria-hidden="true">
+            <canvas id="minimapCanvas"></canvas>
+            <div class="minimap__vp" id="minimapVp"></div>
+          </div>
+        </div>
+
+        <div class="handle handle--row" id="panelResize" role="separator" aria-label="Resize panel"></div>
+
+        <div class="panel" id="bottomPanel">
+          <div class="panel__head">
+            <div class="ptabs" role="tablist">
+              <button class="ptab" data-panel="problems" role="tab">PROBLEMS <span class="ptab__badge" id="problemsBadge">0</span></button>
+              <button class="ptab" data-panel="output" role="tab">OUTPUT</button>
+              <button class="ptab ptab--active" data-panel="terminal" role="tab">TERMINAL</button>
+            </div>
+            <div class="panel__actions">
+              <button class="sbtn" id="panelKillBtn" aria-label="Kill terminal" data-tip="Kill Terminal"><span data-icon="trash"></span></button>
+              <button class="sbtn" id="panelCollapseBtn" aria-label="Collapse panel" data-tip="Collapse Panel"><span data-icon="chevronDown"></span></button>
+            </div>
+          </div>
+          <div class="panel__body">
+            <div class="pview" id="pview-problems" hidden></div>
+            <div class="pview pview--output" id="pview-output" hidden></div>
+            <div class="pview pview--term" id="pview-terminal">
+              <div class="term__tabs">
+                <div class="term__tablist" id="termTablist"></div>
+                <div class="term__tabs-actions">
+                  <button class="sbtn" id="termAddBtn" aria-label="New terminal" data-tip="New Terminal"><span data-icon="plus"></span></button>
+                  <button class="sbtn" id="termTrashBtn" aria-label="Delete terminal" data-tip="Delete Terminal"><span data-icon="trash"></span></button>
+                </div>
+              </div>
+              <div class="term__body" id="termBody" tabindex="0">
+                <div class="term__lines" id="termLines"></div>
+                <div class="term__prompt-line" id="termPromptLine">
+                  <span class="term__arrow">➜</span><span class="term__cwd" id="termCwd">~</span>
+                  <span class="term__input-mirror" id="termMirror"></span><span class="term__cursor" id="termCursor"></span>
+                </div>
+              </div>
+              <input id="termInput" class="term__hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal input">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="handle handle--col" id="agentResize" role="separator" aria-label="Resize agent panel"></div>
+    </div>
+
+    <footer class="statusbar">
+      <div class="statusbar__left">
+        <button class="sb-item sb-item--accent" id="sbWorkspace" aria-label="Open or close folder">
+          <span data-icon="folder"></span><span id="sbWorkspaceName">No folder</span>
+        </button>
+        <button class="sb-item" id="sbChanges" aria-label="Session changes">
+          <span data-icon="git"></span><span id="sbChangeCount">0</span>
+        </button>
+        <button class="sb-item" id="sbProblems" aria-label="Problems"><span class="sb-ico sb-ico--err" data-icon="errorCircle"></span><span id="sbErrCount">0</span><span class="sb-ico sb-ico--warn" data-icon="warning"></span><span id="sbWarnCount">0</span></button>
+      </div>
+      <div class="statusbar__right">
+        <button class="sb-item" id="sbReadonly" hidden>Read-only</button>
+        <button class="sb-item" id="sbCursor">Ln 1, Col 1</button>
+        <button class="sb-item" id="sbIndent">Spaces: 2</button>
+        <button class="sb-item" id="sbEncoding">UTF-8</button>
+        <button class="sb-item" id="sbEol">LF</button>
+        <button class="sb-item" id="sbLang">Plain Text</button>
+        <button class="sb-item" id="sbBell" aria-label="Notifications"><span data-icon="bell"></span></button>
+      </div>
+    </footer>
+  </div>
 </div>
 
-<!-- ======================= OVERLAYS ======================= -->
+<!-- ======================= SHELL OVERLAYS ======================= -->
+<div class="qscrim" id="qScrim" hidden></div>
+
+<div class="qdrawer" id="qDrawer" hidden aria-label="Panel">
+  <div class="qdrawer__head">
+    <h2 class="qdrawer__title" id="qDrawerTitle">Panel</h2>
+    <button class="qbar-icon" id="qDrawerClose" aria-label="Close panel"><span data-icon="close"></span></button>
+  </div>
+  <div class="qdrawer__body" id="qDrawerBody"></div>
+</div>
+
+<div class="overlay overlay--dim" id="qInfoOverlay" hidden>
+  <div class="modal modal--narrow" role="dialog" aria-modal="true" aria-labelledby="qInfoTitle">
+    <div class="modal__head">
+      <h2 id="qInfoTitle">HugMoss Code</h2>
+      <button class="sbtn" id="qInfoClose" aria-label="Close"><span data-icon="close"></span></button>
+    </div>
+    <div class="modal__body"><div class="qinfo" id="qInfoBody"></div></div>
+    <div class="modal__foot">
+      <button class="btn btn--accent" id="qInfoOk">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="qmenu" id="qMenu" hidden role="menu"></div>
+
+<!-- ======================= APP OVERLAYS ======================= -->
 <div class="scrim" id="scrim" hidden></div>
 
 <div class="drop-overlay" id="dropOverlay" hidden>
@@ -397,11 +563,11 @@
       <section class="settings-section">
         <h3>Appearance</h3>
         <div class="theme-cards" role="radiogroup" aria-label="Theme">
-          <button class="theme-card theme-card--active" data-theme-choice="dark" role="radio" aria-checked="true">
+          <button class="theme-card" data-theme-choice="dark" role="radio" aria-checked="false">
             <span class="theme-card__preview theme-card__preview--dark"><i></i><i></i><i></i></span>
             <span>Dark</span><span class="theme-card__check" data-icon="check"></span>
           </button>
-          <button class="theme-card" data-theme-choice="light" role="radio" aria-checked="false">
+          <button class="theme-card theme-card--active" data-theme-choice="light" role="radio" aria-checked="true">
             <span class="theme-card__preview theme-card__preview--light"><i></i><i></i><i></i></span>
             <span>Light</span><span class="theme-card__check" data-icon="check"></span>
           </button>
@@ -474,5 +640,7 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/terminal.js"></script>
 <script src="assets/js/agent.js"></script>
+<script src="assets/js/browser.js"></script>
+<script src="assets/js/shell.js"></script>
 </body>
 </html>

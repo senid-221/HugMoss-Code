@@ -176,6 +176,14 @@
 
   function gatewayOn() { return GATEWAY.on; }
   function gatewayInfo() { return GATEWAY.info; }
+  function hosted(id) {
+    var info = GATEWAY.info;
+    if (!GATEWAY.on || !info || !Array.isArray(info.providers)) return false;
+    for (var i = 0; i < info.providers.length; i++) {
+      if (info.providers[i] && info.providers[i].id === id) return !!info.providers[i].hosted;
+    }
+    return false;
+  }
   function usesGateway(provider) {
     return !!(GATEWAY.on && provider && !provider.custom);
   }
@@ -232,13 +240,17 @@
   }
   function hasKey(id) {
     var p = get(id);
-    return !!p && (!!key(id) || (p.keyless && (!p.custom || !!baseUrl(p))));
+    if (!p) return false;
+    if (key(id)) return true;
+    if (p.custom) return !!baseUrl(p);
+    if (p.keyless) return true;
+    return hosted(id);
   }
   function configuredCount() {
     return LIST.filter(function (p) {
       if (p.custom) return !!baseUrl(p);
       if (p.keyless) return false;
-      return !!key(p.id);
+      return !!key(p.id) || hosted(p.id);
     }).length;
   }
 
@@ -367,7 +379,8 @@
     await probeGateway();
     opts = opts || {};
     var apiKey = opts.apiKey || key(provider.id);
-    if (!provider.custom && !provider.keyless && !apiKey) return Promise.reject(new Error("Add an API key for " + provider.name + " first."));
+    var viaServer = usesGateway(provider) && hosted(provider.id);
+    if (!provider.custom && !provider.keyless && !apiKey && !viaServer) return Promise.reject(new Error("Add an API key for " + provider.name + " first."));
     if (provider.custom && !baseUrl(provider)) return Promise.reject(new Error("Set the base URL for your custom endpoint first."));
     if (!opts.force) {
       var hit = cached(provider.id);
@@ -526,6 +539,7 @@
     key: key,
     setKey: setKey,
     hasKey: hasKey,
+    hosted: hosted,
     configuredCount: configuredCount,
     selection: selection,
     setSelection: setSelection,

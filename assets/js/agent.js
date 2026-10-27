@@ -19,9 +19,12 @@
   var pendingApproval = null;
   var nearBottom = true;
   var streamTimer = null;
+  var runTick = null;
   var lastPrompt = "";
   var usageTotals = null;
   var toolCardSeq = 0;
+  var lastTodos = [];
+  var recognition = null;
 
   var MAX_ROUNDS = 10;
   var MAX_HISTORY = 30;
@@ -36,6 +39,7 @@
     if (!n) return "";
     return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
   }
+  function count(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
   function el(html) {
     var wrap = document.createElement("div");
     wrap.innerHTML = html.trim();
@@ -145,31 +149,123 @@
   }
 
   /* ------------------------------- context ----------------------------- */
+  function updateMeter() {
+    var fill = $("#ctxMeterFill");
+    var label = $("#ctxMeterLabel");
+    var meter = $("#ctxMeter");
+    if (!fill || !label) return;
+    var pct = Math.round((ctx.length / 8) * 100);
+    fill.style.width = pct + "%";
+    label.textContent = pct + "%";
+    if (meter) meter.title = "Context files attached: " + ctx.length + " of 8";
+  }
+
   function renderChips() {
     var host = $("#ctxChips");
     if (!host) return;
     host.innerHTML = ctx.map(function (p) {
       return '<span class="ctx-chip">' + Icons.file(p) + esc(p.split("/").pop()) +
         '<button class="ctx-chip__x" data-drop="' + esc(p) + '" aria-label="Remove ' + esc(p) + '">' + Icons.ui("close", 10) + "</button></span>";
-    }).join("") +
-      '<button class="ctx-chip ctx-add" id="addCtx">' + Icons.ui("plus", 12) + "Add context</button>";
+    }).join("");
     $$("[data-drop]", host).forEach(function (b) {
       b.addEventListener("click", function () {
         ctx = ctx.filter(function (p) { return p !== b.getAttribute("data-drop"); });
         renderChips();
       });
     });
-    var btn = $("#addCtx");
-    if (btn) btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      filePop(btn, function (path) {
-        if (ctx.indexOf(path) < 0 && ctx.length < 8) ctx.push(path);
-        renderChips();
-      });
-    });
+    updateMeter();
   }
 
-  function closePops() { $$(".pop").forEach(function (p) { p.remove(); }); }
+  function closePops() {
+    $$(".pop").forEach(function (p) { p.remove(); });
+    var modeBtn = $("#agentModeBtn");
+    if (modeBtn) modeBtn.setAttribute("aria-expanded", "false");
+    $$(".agent__head [aria-expanded='true']").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+  }
+
+  function placePop(pop, anchor) {
+    var panel = $("#agentPanel");
+    panel.appendChild(pop);
+    var pr = panel.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+    var w = pop.offsetWidth || 220;
+    pop.style.left = Math.max(8, Math.min(ar.left - pr.left, pr.width - w - 8)) + "px";
+    pop.style.top = (ar.bottom - pr.top + 6) + "px";
+    anchor.setAttribute("aria-expanded", "true");
+  }
+
+  function headPop(anchor, title, items, width, noteHtml) {
+    closePops();
+    var pop = el('<div class="pop head-pop"></div>');
+    pop.style.width = (width || 236) + "px";
+    pop.innerHTML = '<div class="pop__title">' + esc(title) + "</div>" + (noteHtml || "");
+    items.forEach(function (it) {
+      var b = el('<button class="pop__item"' + (it.disabled ? " disabled" : "") + ">" +
+        (it.icon ? Icons.ui(it.icon, 14) : "") +
+        "<span>" + esc(it.label) + "</span>" +
+        (it.hint ? '<span class="pop__sub">' + esc(it.hint) + "</span>" : "") + "</button>");
+      if (!it.disabled) b.addEventListener("click", function () {
+        closePops();
+        if (it.action) it.action();
+      });
+      pop.appendChild(b);
+    });
+    placePop(pop, anchor);
+  }
+
+  function sessionPop(anchor) {
+    headPop(anchor, "Session", [
+      { icon: "plus", label: "New session", action: newSession },
+      { icon: "history", label: "Session history", action: function () { historyPop(anchor); } },
+      { icon: "listTodo", label: "Plan", action: function () { todosPop(anchor); } },
+      {
+        icon: "trash", label: "Clear context", hint: ctx.length ? ctx.length + "/8" : "", disabled: !ctx.length,
+        action: function () { ctx = []; renderChips(); }
+      }
+    ], 236);
+  }
+
+  function workspacePop(anchor) {
+    var s = WS.summary();
+    var note = '<div class="pop__ws"><span class="pop__ws-icon">' + Icons.ui("folder", 15) + "</span>" +
+      '<span class="pop__ws-text"><b>' + esc(s.loaded ? s.name : "No folder open") + "</b><em>" +
+      esc(s.loaded ? (s.readonly ? "read-only" : s.count + " files") : "The agent needs a real folder") + "</em></span></div>";
+    var items = [
+      { icon: "folder", label: "Open folder…", action: function () { App.openFolder(); } },
+      { icon: "files", label: "Open files…", action: function () { App.openFiles(); } }
+    ];
+    if (s.loaded) items.push({ icon: "refresh", label: "Refresh explorer", action: function () { App.treeRefresh(); } });
+    headPop(anchor, "Workspace", items, 252, note);
+  }
+
+  function quickPop(anchor) {
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    headPop(anchor, "Quick actions", [
+      { icon: "sparkle", label: "Command palette", hint: "Ctrl+K", action: function () { App.openPalette(); } },
+      { icon: dark ? "sun" : "moon", label: "Toggle theme", action: function () { App.runCommand("theme.toggle"); } },
+      { icon: "gear", label: "Provider settings", action: function () { App.openSettings(null); } }
+    ], 238);
+  }
+
+  function todosPop(anchor) {
+    closePops();
+    var pop = el('<div class="pop head-pop"></div>');
+    pop.style.width = "272px";
+    pop.innerHTML = '<div class="pop__title">Plan</div>';
+    if (!lastTodos.length) {
+      pop.innerHTML += '<div class="pop__empty">No plan yet. Ask the agent to plan a task.</div>';
+    } else {
+      lastTodos.forEach(function (it) {
+        var status = it.status || "pending";
+        var mark = status === "done" ? Icons.ui("check", 12)
+          : status === "active" ? '<span class="spinner spinner--sm"></span>'
+            : status === "cancelled" ? Icons.ui("close", 12)
+              : '<span class="pop__todo-dot"></span>';
+        pop.appendChild(el('<div class="pop__todo pop__todo--' + esc(status) + '"><span class="pop__todo-mark">' + mark +
+          '</span><span class="pop__todo-text">' + esc(it.text) + "</span></div>"));
+      });
+    }
+    placePop(pop, anchor);
+  }
 
   function filePop(anchor, onPick, filterText) {
     closePops();
@@ -196,6 +292,34 @@
     pop.style.bottom = (pr.bottom - ar.top + 6) + "px";
   }
 
+  function modePop(anchor) {
+    closePops();
+    var panel = $("#agentPanel");
+    var modes = [
+      { id: "ask", label: "Ask", desc: "Read-only questions about the workspace" },
+      { id: "agent", label: "Agent", desc: "Read, edit files and keep a plan" },
+      { id: "plan", label: "Plan", desc: "Investigate and plan without editing" }
+    ];
+    var pop = el('<div class="pop mode-pop"></div>');
+    pop.innerHTML = '<div class="pop__title">Agent mode</div>' + modes.map(function (m) {
+      return '<button class="mode-pop__item' + (mode === m.id ? " is-sel" : "") + '" data-mode="' + m.id + '">' +
+        '<span class="mode-pop__check">' + (mode === m.id ? Icons.ui("check", 12) : "") + "</span>" +
+        '<span class="mode-pop__text"><b>' + m.label + "</b><em>" + m.desc + "</em></span></button>";
+    }).join("");
+    $$("[data-mode]", pop).forEach(function (b) {
+      b.addEventListener("click", function () {
+        setMode(b.getAttribute("data-mode"));
+        closePops();
+        $("#agentInput").focus();
+      });
+    });
+    anchor.setAttribute("aria-expanded", "true");
+    panel.appendChild(pop);
+    var pr = panel.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(ar.left - pr.left, pr.width - 244)) + "px";
+    pop.style.bottom = (pr.bottom - ar.top + 6) + "px";
+  }
+
   /* ------------------------------ transcript --------------------------- */
   function userBubble(text) {
     var node = el('<div class="msg msg--user"><div class="msg__ctx"></div><div class="msg__user-bubble"></div></div>');
@@ -207,16 +331,22 @@
     }
     add(node);
   }
-  function agentShell() {
-    var node = el('<div class="msg msg--agent"><div class="msg__agent-row">' +
-      '<span class="agent-avatar"><img src="assets/img/hugmoss-32.png" alt="" width="20" height="20"></span>' +
-      '<div class="msg__body"></div></div></div>');
+  function agentShell(isStatic) {
+    var node = el('<div class="msg msg--agent' + (isStatic ? "" : " is-running") + '"><div class="msg__agent-row"><div class="msg__body"></div></div></div>');
     add(node);
     return $(".msg__body", node);
   }
-  function thinking(body, label) {
-    var node = el('<div class="thinking"><span class="spinner spinner--sm"></span><span class="thinking__text">' + esc(label || "Thinking") + "…</span></div>");
+  function runStatus(body) {
+    var node = el('<div class="thinking thinking--run">' +
+      '<button class="thinking__dot thinking__dot--run" aria-label="Collapse activity" aria-expanded="true">' + Icons.ui("chevronDown", 11) + "</button>" +
+      '<span class="thinking__text">Running · 0s</span></div>');
     body.appendChild(node);
+    var toggle = $(".thinking__dot--run", node);
+    toggle.addEventListener("click", function () {
+      var collapsed = body.classList.toggle("is-collapsed");
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+      toggle.classList.toggle("is-collapsed", collapsed);
+    });
     follow();
     return node;
   }
@@ -239,6 +369,7 @@
       node: node,
       set: function (next) {
         items = next;
+        lastTodos = items.slice();
         list.innerHTML = items.map(function (it) {
           var status = it.status || "pending";
           var statusHtml = status === "active" ? '<span class="spinner spinner--sm"></span>'
@@ -266,20 +397,21 @@
 
   /* ------------------------------ tool cards --------------------------- */
   var TOOL_META = {
-    list_files: { label: "List", cls: "read" },
-    read_file: { label: "Read", cls: "read" },
-    search: { label: "Search", cls: "grep" },
-    write_file: { label: "Write", cls: "edit" },
-    delete_file: { label: "Delete", cls: "bash" },
-    update_todos: { label: "Plan", cls: "read" }
+    list_files: { label: "List files" },
+    read_file: { label: "Read file" },
+    search: { label: "Search" },
+    write_file: { label: "Edit file" },
+    delete_file: { label: "Delete file" },
+    update_todos: { label: "Plan" }
   };
+  var FILE_TOOLS = { read_file: true, write_file: true, delete_file: true };
 
   function toolCard(body, name, target, meta) {
-    var spec = TOOL_META[name] || { label: name, cls: "read" };
+    var spec = TOOL_META[name] || { label: name };
     var node = el('<div class="tool"><div class="tool__head">' +
       '<span class="tool__status"><span class="spinner spinner--sm"></span></span>' +
-      '<span class="tool__kind tool__kind--' + spec.cls + '">' + esc(spec.label) + "</span>" +
-      '<span class="tool__target">' + esc(target || "") + "</span>" +
+      '<span class="tool__label">' + esc(spec.label) + "</span>" +
+      (target ? '<span class="tool__target' + (FILE_TOOLS[name] ? " tool__target--chip" : "") + '" title="' + esc(target) + '">' + esc(target) + "</span>" : "") +
       '<span class="tool__meta">' + esc(meta || "") + "</span>" +
       '<span class="tool__chev">' + Icons.ui("chevron", 12) + "</span></div>" +
       '<div class="tool__body"></div></div>');
@@ -343,25 +475,45 @@
   function approvalCard(body, opts) {
     return new Promise(function (resolve) {
       var stat = diffStat(opts.oldText, opts.newText);
-      var node = el('<div class="approval"><div class="approval__head">' +
-        Icons.ui(opts.action === "delete" ? "trash" : "pencil", 14) +
-        "<span>" + esc(opts.action === "delete" ? "Approve deletion" : "Approve change") + "</span>" +
-        '<span class="approval__stat"><b class="c-green">+' + stat.adds + '</b> <b class="c-red">−' + stat.dels + "</b></span></div>" +
-        '<div class="approval__path">' + Icons.file(opts.path) + esc(opts.path) + "</div>" +
-        '<div class="approval__note"></div>' + diffHtml(opts.oldText, opts.newText, 40) +
-        '<div class="approval__foot"><button class="btn btn--accent btn--sm" data-apply>Apply</button>' +
-        '<button class="btn btn--ghost btn--sm" data-discard>Discard</button>' +
-        '<span class="approval__hint">The agent is waiting</span></div></div>');
+      var isDelete = opts.action === "delete";
+      var node = el('<div class="approval"><div class="approval__head">' + Icons.ui("warning", 16) +
+        '<span class="approval__title">' + esc(isDelete ? "HugMoss wants to delete a file" : "HugMoss wants to edit a file") + "</span></div>" +
+        '<div class="approval__code">' + diffHtml(opts.oldText, opts.newText, 40) + "</div>" +
+        '<div class="approval__note"></div>' +
+        '<div class="approval__explain" hidden></div>' +
+        '<div class="approval__foot">' +
+        '<button class="approval__explain-btn" data-explain aria-expanded="false">' + Icons.ui("pencil", 12) +
+        '<span data-explain-label>Explain</span></button>' +
+        '<span class="approval__state" hidden></span>' +
+        '<div class="approval__actions">' +
+        '<span class="approval__stat"><b class="c-green">+' + stat.adds + '</b> <b class="c-red">−' + stat.dels + "</b></span>" +
+        '<button class="btn btn--deny" data-discard>Deny</button>' +
+        '<button class="btn btn--approve" data-apply>Allow once</button>' +
+        "</div></div></div>");
 
-      if (WS.isDirty(opts.path)) {
-        $(".approval__note", node).textContent = "This file has unsaved edits in the editor; applying replaces them.";
-      } else if (WS.readonly) {
-        $(".approval__note", node).textContent = "This workspace is read-only, so the change cannot be written to disk.";
-      } else if (!WS.loaded) {
-        $(".approval__note", node).textContent = "No folder is open; there is nowhere to write this change.";
-      }
+      var warning = "";
+      if (WS.isDirty(opts.path)) warning = "This file has unsaved edits in the editor; allowing replaces them.";
+      else if (WS.readonly) warning = "This workspace is read-only, so the change cannot be written to disk.";
+      else if (!WS.loaded) warning = "No folder is open; there is nowhere to write this change.";
+      if (warning) $(".approval__note", node).textContent = warning;
+
+      var explain = $(".approval__explain", node);
+      explain.textContent = isDelete
+        ? "Allowing permanently removes " + opts.path + " from the folder. The file stays in Source Control, so you can restore it from there."
+        : "Allowing writes the diff above to " + opts.path + " on disk (" + count(stat.adds, "line") + " added, " + count(stat.dels, "line") + " removed). Nothing is written while you decide.";
+      if (warning) explain.textContent += " " + warning;
+
       body.appendChild(node);
       follow();
+
+      var explainBtn = $("[data-explain]", node);
+      explainBtn.addEventListener("click", function () {
+        var opening = explain.hidden;
+        explain.hidden = !opening;
+        explainBtn.setAttribute("aria-expanded", String(opening));
+        $("[data-explain-label]", explainBtn).textContent = opening ? "Hide" : "Explain";
+        follow();
+      });
 
       var settled = false;
       function settle(ok) {
@@ -369,8 +521,10 @@
         settled = true;
         pendingApproval = null;
         node.classList.add(ok ? "is-applied" : "is-discarded");
-        $$("button", $(".approval__foot", node)).forEach(function (b) { b.disabled = true; });
-        $(".approval__hint", node).textContent = ok ? "Approved" : "Discarded";
+        $$(".approval__actions button", node).forEach(function (b) { b.disabled = true; });
+        var state = $(".approval__state", node);
+        state.hidden = false;
+        state.textContent = ok ? "Allowed once" : "Denied";
         resolve(ok);
       }
       $("[data-apply]", node).addEventListener("click", function () { settle(true); });
@@ -479,7 +633,8 @@
       }
 
       if (name === "list_files") {
-        var cardL = toolCard(body, name, args.path || ".", "");
+        var listTarget = args.path && args.path !== "." ? args.path : "";
+        var cardL = toolCard(body, name, listTarget, "");
         var listing = WS.listForAgent(args.path || "");
         cardL.finish(WS.visiblePaths().length + " files", '<pre class="tool__pre">' + esc(listing.slice(0, 4000)) + "</pre>", false);
         return listing;
@@ -526,7 +681,7 @@
         var rec = WS.record(path);
         var oldText = rec && !rec.deleted ? rec.content : "";
         var stat = diffStat(oldText, args.content);
-        var cardW = toolCard(body, name, path, stat.adds + " additions, " + stat.dels + " deletions");
+        var cardW = toolCard(body, name, path, count(stat.adds, "addition") + ", " + count(stat.dels, "deletion"));
         if (WS.readonly) {
           cardW.fail("This workspace is read-only, so the agent cannot write files.");
           return "Error: the workspace is read-only. Ask the user to reopen the folder with write access.";
@@ -887,12 +1042,13 @@
         if (q && !models.length) return;
         any = true;
         var connected = Providers.hasKey(p.id);
+        var ready = connected && !Providers.key(p.id) && Providers.hosted(p.id);
         var all = currentModels(p);
         var visible = q || expanded[p.id] ? models : all.slice(0, 14);
         html += '<div class="model-group" data-provider="' + p.id + '">' +
           '<div class="model-group__head"><span class="model-brand" data-color="' + (p.color || "currentColor") + '">' + Providers.mark(p.mark, 15) + "</span>" +
           '<span class="model-group__name">' + esc(p.name) + "</span>" +
-          '<span class="model-group__state ' + (connected ? "is-on" : "") + '">' + (p.id === "ollama" ? "local" : connected ? "key saved" : "key needed") + "</span></div>";
+          '<span class="model-group__state ' + (connected ? "is-on" : "") + '">' + (p.id === "ollama" ? "local" : ready ? "ready" : connected ? "key saved" : "key needed") + "</span></div>";
         visible.forEach(function (m) {
           var active = sel && sel.provider === p.id && sel.model === m.id;
           html += '<button class="model-row' + (active ? " model-row--sel" : "") + '" data-provider="' + p.id + '" data-model="' + esc(m.id) + '" data-label="' + esc(m.label) + '">' +
@@ -1033,12 +1189,30 @@
     list.sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); });
     writeSessions(list);
     updateSessionLabel();
+    if (window.Shell && Shell.sessionChanged) Shell.sessionChanged(session.id);
   }
   function updateSessionLabel() {
     var label = $("#agentSessionName");
     if (!label) return;
-    if (running) return;
-    label.textContent = session && session.title ? session.title.slice(0, 44) : "New session";
+    label.textContent = session && session.title ? session.title : "New session";
+  }
+
+  function exportMarkdown() {
+    if (!messages.length) return "";
+    var out = ["# " + ((session && session.title) || "HugMoss session"), "",
+      "_Exported " + new Date().toLocaleString() + "_", ""];
+    messages.forEach(function (m) {
+      if (m.role === "user") {
+        out.push("## You", "", m.text || "", "");
+      } else if (m.role === "assistant") {
+        if (m.text) out.push("## Agent", "", m.text, "");
+      } else if (m.role === "tool") {
+        (m.results || []).forEach(function (r) {
+          out.push("```", String(r.content == null ? "" : r.content).slice(0, 6000), "```", "");
+        });
+      }
+    });
+    return out.join("\n");
   }
 
   function historyPop(anchor) {
@@ -1082,12 +1256,14 @@
       if (m.role === "user") userBubble(m.text);
       else if (m.role === "assistant") {
         if (!m.text) return;
-        var body = agentShell();
+        var body = agentShell(true);
         proseBlock(body).innerHTML = md(m.text);
       }
     });
     add(el('<div class="done-meta">' + Icons.ui("history", 12) + "<span>Restored session · " + esc(s.model || "model not recorded") + "</span></div>"));
+    lastTodos = [];
     updateSessionLabel();
+    syncPlaceholder();
     follow();
   }
 
@@ -1105,16 +1281,27 @@
     btn.innerHTML = Icons.ui("stop", 15);
     btn.setAttribute("aria-label", "Stop agent");
     var sel = Providers.selection();
-    $("#agentSessionName").textContent = "Running · " + (sel ? sel.label : "model");
+    updateSessionLabel();
+    $("#agentSessionName").title = sel ? sel.label : "";
+    if (runTick) clearInterval(runTick);
+    runTick = setInterval(function () {
+      var text = "Running · " + Math.round((Date.now() - startedAt) / 1000) + "s";
+      $$(".thinking--run .thinking__text").forEach(function (n) { n.textContent = text; });
+    }, 1000);
   }
   function endRun() {
     running = false;
+    if (runTick) { clearInterval(runTick); runTick = null; }
+    $$(".msg--agent.is-running").forEach(function (m) { m.classList.remove("is-running"); });
+    $$(".thinking--run").forEach(function (n) { n.remove(); });
+    $$(".msg__body.is-collapsed").forEach(function (b) { b.classList.remove("is-collapsed"); });
     var btn = $("#sendBtn");
     btn.classList.remove("send-btn--stop");
     btn.innerHTML = Icons.ui("send", 15);
     btn.setAttribute("aria-label", "Send message");
     btn.disabled = !$("#agentInput").value.trim();
     updateSessionLabel();
+    syncPlaceholder();
     abort = null;
     follow();
   }
@@ -1192,20 +1379,20 @@
     renderChips();
     $("#agentInput").value = "";
     autosize();
+    syncPlaceholder();
     $("#sendBtn").disabled = true;
     beginRun();
     saveSession();
     var body = agentShell();
+    runStatus(body);
     todoApi = null;
 
     try {
       for (var round = 0; round < MAX_ROUNDS && !halted; round++) {
-        var think = thinking(body, round === 0 ? "Thinking" : "Working");
         var prose = null;
         var renderPending = false;
         var pendingText = "";
         var onText = function (delta, full) {
-          if (think && think.parentNode) think.remove();
           pendingText = full;
           if (!prose) prose = proseBlock(body);
           if (renderPending) return;
@@ -1217,26 +1404,26 @@
             follow();
           }, 45);
         };
-        var result;
-        try {
-          result = await AI.stream({
-            providerId: sel.provider,
-            apiKey: Providers.key(sel.provider),
-            model: sel.model,
-            system: systemPrompt(),
-            messages: apiMessages(),
-            tools: toolSpecs(),
-            signal: abort.signal,
-            onText: onText
-          });
-        } finally {
-          if (think && think.parentNode) think.remove();
-        }
+        var result = await AI.stream({
+          providerId: sel.provider,
+          apiKey: Providers.key(sel.provider),
+          model: sel.model,
+          system: systemPrompt(),
+          messages: apiMessages(),
+          tools: toolSpecs(),
+          signal: abort.signal,
+          onText: onText
+        });
         if (halted) break;
         if (prose) prose.innerHTML = md(result.text || pendingText);
         else if (result.text) { prose = proseBlock(body); prose.innerHTML = md(result.text); }
         if (result.reasoning) {
-          var thought = el('<details class="thought"><summary>' + Icons.ui("bookOpen", 12) + "Reasoning · " + fmtTokens(result.reasoning.length) + " chars</summary><pre></pre></details>");
+          var thoughtText = String(result.reasoning).replace(/\s+/g, " ").trim();
+          var thought = el('<details class="thought"><summary>' +
+            '<span class="thought__dot">' + Icons.ui("check", 10) + "</span>" +
+            '<span class="thought__label">Thought</span>' +
+            '<span class="thought__text">' + esc(thoughtText.slice(0, 140)) + (thoughtText.length > 140 ? "…" : "") + "</span>" +
+            '<span class="thought__chev">' + Icons.ui("chevron", 12) + "</span></summary><pre></pre></details>");
           $("pre", thought).textContent = result.reasoning;
           body.insertBefore(thought, prose || null);
         }
@@ -1299,19 +1486,71 @@
     var ta = $("#agentInput");
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 168) + "px";
+    ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
   }
   function setMode(next) {
     mode = next === "ask" || next === "plan" ? next : "agent";
-    $$(".mpill").forEach(function (p) { p.classList.toggle("mpill--active", p.getAttribute("data-mode") === mode); });
+    var modeLabel = $("#agentModeLabel");
+    if (modeLabel) modeLabel.textContent = mode === "ask" ? "Ask" : mode === "plan" ? "Plan" : "Agent";
+    var modeBtn = $("#agentModeBtn");
+    if (modeBtn) {
+      modeBtn.setAttribute("aria-expanded", "false");
+      modeBtn.title = mode === "ask" ? "Ask mode · read-only" : mode === "plan" ? "Plan mode · no edits" : "Agent mode · can edit files";
+    }
     var sel = $("#agentModeSelect");
     if (sel && sel.value !== mode) sel.value = mode;
-    $("#agentInput").placeholder = mode === "plan"
+    syncPlaceholder();
+    if (App.settings && App.settings.agentMode !== mode) { App.settings.agentMode = mode; }
+  }
+
+  function syncPlaceholder() {
+    var ta = $("#agentInput");
+    if (!ta) return;
+    ta.placeholder = mode === "plan"
       ? "Describe a goal — the agent will plan without editing files"
       : mode === "ask"
         ? "Ask about this workspace (read-only)"
-        : "Ask anything, or describe a task… (@ to mention files)";
-    if (App.settings && App.settings.agentMode !== mode) { App.settings.agentMode = mode; }
+        : messages.length ? "Continue this task…" : "Describe a task, or ask a question…";
+  }
+
+  function toggleDictation(btn) {
+    if (recognition) { recognition.stop(); return; }
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var ta = $("#agentInput");
+    if (!SR || !ta) return;
+    var base = ta.value;
+    var rec = new SR();
+    recognition = rec;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = navigator.language || "en-US";
+    rec.onresult = function (e) {
+      var text = "";
+      for (var i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      ta.value = (base ? base.replace(/\s+$/, "") + " " : "") + text.trim();
+      autosize();
+      $("#sendBtn").disabled = !ta.value.trim() || running;
+    };
+    rec.onerror = function (e) {
+      if (e.error !== "aborted" && e.error !== "no-speech") {
+        App.toast({ title: "Dictation stopped", msg: "Microphone error: " + e.error + ".", type: "warn" });
+      }
+    };
+    rec.onend = function () {
+      recognition = null;
+      btn.classList.remove("is-recording");
+      btn.setAttribute("aria-pressed", "false");
+      btn.title = "Dictate";
+      ta.focus();
+    };
+    btn.classList.add("is-recording");
+    btn.setAttribute("aria-pressed", "true");
+    btn.title = "Stop dictation";
+    try { rec.start(); } catch (err) {
+      recognition = null;
+      btn.classList.remove("is-recording");
+      btn.setAttribute("aria-pressed", "false");
+    }
   }
 
   function suggest(title, sub, icon, action) {
@@ -1332,7 +1571,7 @@
     if (!WS.loaded) {
       host.appendChild(suggest("Open a project folder", "The agent works on real files on disk", "folder", function () { App.openFolder(); }));
       host.appendChild(suggest("What can HugMoss do?", "Providers, tools, approvals, modes", "bookOpen", function () {
-        var body = agentShell();
+        var body = agentShell(true);
         hideEmpty();
         proseBlock(body).innerHTML = md("HugMoss Code is a browser IDE with a real folder on disk and a **bring-your-own-key** agent. Open a folder, connect a provider in Settings, then ask me to read, search, create or edit files.\n\n- **Agent** mode can write files — every write shows a diff and waits for your approval.\n- **Ask** mode is read-only.\n- **Plan** mode investigates and produces a plan without touching files.\n- I cannot run shell commands or builds in the browser; the terminal is a real file browser, not a process host.\n\nBuilt by IRAGUHA Vincent.");
         add(el('<div class="done-meta">' + Icons.ui("infoCircle", 12) + "<span>Local overview · no request sent</span></div>"));
@@ -1357,9 +1596,11 @@
       '<h3 class="agent__empty-title">Hi Vincent, I&rsquo;m your coding agent</h3>' +
       '<p class="agent__empty-credit">Built by IRAGUHA Vincent</p>' +
       '<div class="agent__suggestions" id="agentSuggestions"></div></div>';
+    lastTodos = [];
     mountSuggestions();
     updateSessionLabel();
     renderChips();
+    syncPlaceholder();
     $("#agentInput").value = "";
     autosize();
   }
@@ -1391,20 +1632,47 @@
     });
     ta.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(ta.value); }
-      if (e.key === "Escape") closePops();
+      if (e.key === "Escape") { var hadPop = !!document.querySelector(".pop"); closePops(); if (hadPop) e.stopPropagation(); }
     });
     $("#sendBtn").addEventListener("click", function () {
       if (running) halt();
       else submit(ta.value);
     });
-    $$(".mpill").forEach(function (p) {
-      p.addEventListener("click", function () { setMode(p.getAttribute("data-mode")); });
-    });
+    $("#agentModeBtn").addEventListener("click", function (e) { e.stopPropagation(); modePop($("#agentModeBtn")); });
     $("#modelBtn").addEventListener("click", function (e) { e.stopPropagation(); modelPop($("#modelBtn")); });
-    $("#agentHistoryBtn").addEventListener("click", function (e) { e.stopPropagation(); historyPop($("#agentHistoryBtn")); });
-    $("#agentNewChatBtn").addEventListener("click", newSession);
+    $("#agentMenuBtn").addEventListener("click", function (e) { e.stopPropagation(); sessionPop($("#agentMenuBtn")); });
+    $("#agentWorkspaceBtn").addEventListener("click", function (e) { e.stopPropagation(); workspacePop($("#agentWorkspaceBtn")); });
+    $("#agentQuickBtn").addEventListener("click", function (e) { e.stopPropagation(); quickPop($("#agentQuickBtn")); });
+    $("#agentTodosBtn").addEventListener("click", function (e) { e.stopPropagation(); todosPop($("#agentTodosBtn")); });
+    var micBtn = $("#micBtn");
+    if (micBtn) {
+      if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) micBtn.hidden = true;
+      else micBtn.addEventListener("click", function () { toggleDictation(micBtn); });
+    }
+    var addCtx = $("#agentAddBtn");
+    if (addCtx) addCtx.addEventListener("click", function (e) {
+      e.stopPropagation();
+      filePop(addCtx, function (path) {
+        if (ctx.indexOf(path) < 0 && ctx.length < 8) ctx.push(path);
+        renderChips();
+      });
+    });
+    var attach = $("#attachBtn");
+    if (attach) attach.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var active = App.state && App.state.active;
+      if (active && !WS.isSecret(active)) {
+        if (ctx.indexOf(active) < 0 && ctx.length < 8) ctx.push(active);
+        renderChips();
+        return;
+      }
+      filePop(attach, function (path) {
+        if (ctx.indexOf(path) < 0 && ctx.length < 8) ctx.push(path);
+        renderChips();
+      });
+    });
     document.addEventListener("click", function (e) {
-      if (!e.target.closest(".pop") && !e.target.closest("#modelBtn") && !e.target.closest("#addCtx") && !e.target.closest("#agentHistoryBtn")) closePops();
+      if (!e.target.closest(".pop") && !e.target.closest("[aria-haspopup]") && !e.target.closest("#agentAddBtn") && !e.target.closest("#attachBtn")) closePops();
     });
 
     var s = streamEl();
@@ -1429,6 +1697,11 @@
     isRunning: function () { return running; },
     refreshModel: syncModelButton,
     refreshSuggestions: mountSuggestions,
-    openModelPicker: function () { modelPop($("#modelBtn")); }
+    openModelPicker: function () { modelPop($("#modelBtn")); },
+    recentSessions: readSessions,
+    closePops: closePops,
+    openSession: loadSession,
+    currentId: function () { return session ? session.id : null; },
+    exportMarkdown: exportMarkdown
   };
 })();

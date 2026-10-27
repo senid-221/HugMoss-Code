@@ -9,14 +9,14 @@
   var STORE_KEY = "hugmoss.ide.settings.v2";
   var LEGACY_KEY = "hugmoss.ide.settings";
   var defaults = {
-    theme: "dark",
+    theme: "light",
     fontSize: 13,
     wrap: false,
     minimap: true,
     agentMode: "agent",
     model: null,
     sbW: 264,
-    agW: 400,
+    agW: 700,
     panelH: 220,
     sidebarOpen: true,
     agentOpen: true,
@@ -32,6 +32,12 @@
       } catch (e) { /* unreadable settings fall back to defaults */ }
     });
     base.panelTab = base.panelTab === "problems" || base.panelTab === "output" ? base.panelTab : "terminal";
+    if (base.agW === 520 || base.agW === 640) base.agW = defaults.agW;
+    if (!base.shell) {
+      base.shell = "qoder";
+      base.theme = defaults.theme;
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(base)); } catch (e) { /* storage unavailable */ }
+    }
     return base;
   })();
   var saveTimer = null;
@@ -679,6 +685,7 @@
       tab = { key: tabKey(path, kind), path: path, kind: kind };
       state.tabs.push(tab);
     }
+    if (window.Shell && Shell.showEditor) Shell.showEditor(path);
     activateTab(tab, opts);
     expandAncestors(path);
     closeDrawers();
@@ -921,7 +928,7 @@
     if (!title) return;
     if (!WS.loaded) {
       title.textContent = "Code with a real folder.";
-      sub.textContent = "HugMoss reads and writes files on your disk with your browser. Nothing is uploaded, and the agent uses your own API key.";
+      sub.textContent = "HugMoss reads and writes files on your disk with your browser. Nothing is uploaded, and the agent calls the provider you select.";
       cta.innerHTML =
         '<button class="btn btn--accent" data-welcome="open">Open Folder</button>' +
         '<button class="btn btn--ghost" data-welcome="files">Open Files</button>' +
@@ -1179,7 +1186,9 @@
   function providerState(p) {
     if (p.custom) return Providers.baseUrl(p) ? { text: "Configured", cls: "is-on" } : { text: "Set endpoint", cls: "is-off" };
     if (p.id === "ollama") return { text: "Local", cls: "is-local" };
-    return Providers.hasKey(p.id) ? { text: "Key saved", cls: "is-on" } : { text: "Key needed", cls: "is-off" };
+    if (Providers.key(p.id)) return { text: "Key saved", cls: "is-on" };
+    if (Providers.hosted(p.id)) return { text: "Hosted key", cls: "is-on" };
+    return { text: "Key needed", cls: "is-off" };
   }
 
   function renderProviders() {
@@ -1190,6 +1199,7 @@
       var st = providerState(p);
       var open = !!providerOpen[p.id];
       var keyed = !!Providers.key(p.id);
+      var hosted = Providers.hosted(p.id);
       var cfg = Providers.customConfig();
       var body = '<div class="provider__body">' +
         (p.note ? '<p class="provider__note">' + HL.esc(p.note) + "</p>" : "") +
@@ -1201,9 +1211,9 @@
           : "") +
         (p.id === "ollama"
           ? '<div class="provider__endpoint"><span>Endpoint</span><code>' + HL.esc(Providers.baseUrl(p)) + "</code></div>"
-          : '<label class="provider__label" for="key_' + p.id + '">API key' + (p.keyless ? " (optional)" : "") + "</label>" +
+          : '<label class="provider__label" for="key_' + p.id + '">API key' + (p.keyless || hosted ? " (optional)" : "") + "</label>" +
             '<div class="provider__keyrow">' +
-            '<input class="provider__input" id="key_' + p.id + '" data-key type="password" autocomplete="new-password" spellcheck="false" placeholder="' + (keyed ? "Saved — paste to replace" : (p.custom ? "Optional bearer token" : "Paste your key")) + '">' +
+            '<input class="provider__input" id="key_' + p.id + '" data-key type="password" autocomplete="new-password" spellcheck="false" placeholder="' + (keyed ? "Saved — paste to replace" : hosted ? "Optional — this deployment supplies a key" : (p.custom ? "Optional bearer token" : "Paste your key")) + '">' +
             '<button class="sbtn provider__reveal" data-reveal aria-label="Show key" data-tip="Show key">' + Icons.ui("eye", 14) + "</button>" +
             "</div>") +
         '<div class="provider__actions">' +
@@ -1266,7 +1276,7 @@
     var note = $("#providerNote");
     if (!note) return;
     note.innerHTML = Providers.gatewayOn()
-      ? "HugMoss keeps your keys in this browser&rsquo;s localStorage. The local gateway relays each request and forwards your key per request without storing it."
+      ? "Keys you enter here stay in this browser&rsquo;s localStorage. Requests go through this deployment&rsquo;s gateway, which uses your key when present and otherwise uses the provider key configured on the server."
       : "HugMoss keeps your keys in this browser&rsquo;s localStorage. This page is running in direct mode, so requests go straight from this tab to the provider.";
   }
 
@@ -1454,6 +1464,7 @@
     { id: "file.close", label: "File: Close Editor", hint: "" },
     { id: "file.closeAll", label: "File: Close All Editors", hint: "" },
     { id: "palette.files", label: "Go to File…", hint: "Ctrl+K" },
+    { id: "explorer.view", label: "View: Explorer", hint: "" },
     { id: "search.view", label: "Search: Find in Files", hint: "Ctrl+Shift+F" },
     { id: "scm.view", label: "Changes: Open Session Changes", hint: "" },
     { id: "skills.view", label: "Skills: Open NVIDIA Skills", hint: "" },
@@ -1464,9 +1475,8 @@
     { id: "term.new", label: "Terminal: New Shell", hint: "" },
     { id: "term.clear", label: "Terminal: Clear", hint: "" },
     { id: "theme.toggle", label: "View: Toggle Theme", hint: "Alt+T" },
-    { id: "sidebar.toggle", label: "View: Toggle Sidebar", hint: "Alt+B" },
-    { id: "panel.toggle", label: "View: Toggle Panel", hint: "Alt+J" },
-    { id: "chat.toggle", label: "View: Toggle Agent Chat", hint: "Alt+A" },
+    { id: "sidebar.toggle", label: "View: Toggle Task Rail", hint: "Ctrl+B" },
+    { id: "panel.toggle", label: "View: Toggle Editor Panel", hint: "Alt+J" },
     { id: "wrap.toggle", label: "View: Toggle Word Wrap", hint: "" },
     { id: "minimap.toggle", label: "View: Toggle Minimap", hint: "" },
     { id: "welcome", label: "View: Show Welcome", hint: "" },
@@ -1550,6 +1560,13 @@
     else runCommand(row.target);
   }
 
+  function showPanelInEditor(tab) {
+    if (window.Shell && !Shell.editorOpen()) Shell.showEditor(null, { silent: true });
+    if (!settings.panelOpen) setPanelOpen(true);
+    setPanelTab(tab || "terminal");
+    if (window.Shell && Shell.route) Shell.route("terminal");
+  }
+
   function runCommand(id) {
     switch (id) {
       case "folder.open": openFolderFlow(); break;
@@ -1564,22 +1581,29 @@
       case "file.close": if (state.activeKey) closeTab(state.activeKey); break;
       case "file.closeAll": closeAllTabs(); break;
       case "palette.files": openPalette("files", ""); break;
-      case "search.view": activateView("search"); break;
-      case "scm.view": activateView("scm"); break;
-      case "skills.view": activateView("skills"); break;
+      case "palette.commands": openPalette("commands", ">"); break;
+      case "search.drawer": if (window.Shell) Shell.openView("search", "Search"); break;
+      case "nav.toggle": if (window.Shell) Shell.toggleNav(); break;
+      case "browser.toggle": if (window.Shell) Shell.toggleBrowser(); break;
+      case "explorer.view": if (window.Shell) Shell.openView("explorer", "Explorer"); else activateView("explorer"); break;
+      case "search.view": if (window.Shell) Shell.openView("search", "Search"); else activateView("search"); break;
+      case "scm.view": if (window.Shell) Shell.openView("scm", "Changes"); else activateView("scm"); break;
+      case "skills.view": if (window.Shell) Shell.openView("skills", "Knowledge Center"); else activateView("skills"); break;
       case "agent.new": setAgentOpen(true); if (window.Agent) Agent.newSession(); break;
       case "agent.focus": setAgentOpen(true); syncDrawerChrome(); if (window.Agent) Agent.focusInput(); break;
       case "agent.model": setAgentOpen(true); syncDrawerChrome(); if (window.Agent) Agent.openModelPicker(); break;
       case "agent.providers": openSettings(null); break;
-      case "term.new": setPanelOpen(true); setPanelTab("terminal"); if (window.Terminal) Terminal.newSession(); break;
-      case "term.clear": setPanelOpen(true); setPanelTab("terminal"); if (window.Terminal) Terminal.clear(); break;
+      case "term.new": showPanelInEditor("terminal"); if (window.Terminal) Terminal.newSession(); break;
+      case "term.clear": showPanelInEditor("terminal"); if (window.Terminal) Terminal.clear(); break;
       case "theme.toggle": toggleTheme(); break;
-      case "sidebar.toggle": setSidebarOpen(!settings.sidebarOpen); syncDrawerChrome(); break;
-      case "panel.toggle": setPanelOpen(!settings.panelOpen); break;
-      case "chat.toggle": setAgentOpen(!settings.agentOpen); syncDrawerChrome(); break;
+      case "sidebar.toggle": if (window.Shell) Shell.toggleNav(); else { setSidebarOpen(!settings.sidebarOpen); syncDrawerChrome(); } break;
+      case "panel.toggle":
+        if (window.Shell && !Shell.editorOpen()) showPanelInEditor(settings.panelTab || "terminal");
+        else setPanelOpen(!settings.panelOpen);
+        break;
       case "wrap.toggle": setWrap(!settings.wrap); break;
       case "minimap.toggle": setMinimap(!settings.minimap); break;
-      case "welcome": showWelcomeLayer(); break;
+      case "welcome": if (window.Shell) Shell.showEditor(null); else showWelcomeLayer(); break;
       case "settings": openSettings(null); break;
     }
   }
@@ -1639,6 +1663,7 @@
     $("#settingsOverlay").hidden = false;
     renderProviders();
     syncSettingsControls();
+    if (window.Shell && Shell.route) Shell.route("settings");
     if (id) {
       setTimeout(function () {
         var node = $('.provider[data-provider="' + id + '"]');
@@ -1647,7 +1672,11 @@
     }
     setTimeout(function () { $("#settingsClose").focus(); }, 10);
   }
-  function closeSettings() { $("#settingsOverlay").hidden = true; }
+  function closeSettingsUI() { $("#settingsOverlay").hidden = true; }
+  function closeSettings() {
+    closeSettingsUI();
+    if (window.Shell && Shell.modalClosed) Shell.modalClosed();
+  }
 
   /* ============================== MENUS =============================== */
   var menuSpecs = {
@@ -1658,33 +1687,23 @@
       { label: "New File…", cmd: "file.new" },
       { label: "New Folder…", cmd: "file.folder" },
       { type: "sep" },
-      { label: "Save", kbd: "Ctrl+S", cmd: "file.save" },
-      { label: "Save All", kbd: "Ctrl+Shift+S", cmd: "file.saveAll" },
-      { label: "Download a Copy", cmd: "file.download" },
-      { type: "sep" },
-      { label: "Close Editor", cmd: "file.close" },
-      { label: "Close All Editors", cmd: "file.closeAll" }
+      { label: "Close Folder", cmd: "folder.close" }
     ],
     edit: [
-      { label: "Find in Files…", kbd: "Ctrl+Shift+F", cmd: "search.view" },
+      { label: "Find in Files…", kbd: "Ctrl+Shift+F", cmd: "search.drawer" },
       { label: "Go to File…", kbd: "Ctrl+K", cmd: "palette.files" },
-      { type: "sep" },
-      { label: "Undo / Redo", kbd: "Ctrl+Z / Ctrl+Y", disabled: true }
+      { label: "Command Palette…", kbd: "Ctrl+Shift+P", cmd: "palette.commands" }
     ],
     selection: [
       { label: "Select All", kbd: "Ctrl+A", disabled: true },
       { label: "Expand Selection", disabled: true }
     ],
     view: [
-      { label: "Toggle Sidebar", kbd: "Alt+B", cmd: "sidebar.toggle" },
-      { label: "Toggle Panel", kbd: "Alt+J", cmd: "panel.toggle" },
-      { label: "Toggle Agent Chat", kbd: "Alt+A", cmd: "chat.toggle" },
-      { type: "sep" },
-      { label: "Toggle Word Wrap", cmd: "wrap.toggle" },
-      { label: "Toggle Minimap", cmd: "minimap.toggle" },
+      { label: "Toggle Navigation", kbd: "Ctrl+B", cmd: "nav.toggle" },
+      { label: "Toggle Browser", kbd: "Ctrl+Shift+B", cmd: "browser.toggle" },
       { type: "sep" },
       { label: "Toggle Theme", kbd: "Alt+T", cmd: "theme.toggle" },
-      { label: "Show Welcome", cmd: "welcome" }
+      { label: "Command Palette…", kbd: "Ctrl+Shift+P", cmd: "palette.commands" }
     ],
     go: [
       { label: "Go to File…", kbd: "Ctrl+K", cmd: "palette.files" },
@@ -1734,7 +1753,8 @@
         var cmd = btn.getAttribute("data-cmd");
         hideMenu();
         if (cmd === "about") {
-          toast({ title: "HugMoss Code", msg: "Browser IDE · real folder, bring your own AI key · built by IRAGUHA Vincent", type: "agent", timeout: 5200 });
+          if (window.Shell && Shell.about) Shell.about();
+          else toast({ title: "HugMoss Code", msg: "Browser IDE · real folder, bring your own AI key · built by IRAGUHA Vincent", type: "agent", timeout: 5200 });
           return;
         }
         if (cmd === "repo") {
@@ -1963,8 +1983,12 @@
     var host = $("#providerSummary");
     if (!host) return;
     var count = Providers.configuredCount();
+    var hosted = 0;
+    Providers.list().forEach(function (p) { if (Providers.hosted(p.id)) hosted += 1; });
     host.textContent = count
-      ? plural(count, "provider") + " configured · requests go straight to the provider with your key."
+      ? plural(count, "provider") + " ready · " + (hosted
+        ? "this deployment supplies " + plural(hosted, "hosted key") + "."
+        : "requests use the key saved in this browser.")
       : "No provider configured. Add a key in Settings to use the agent.";
     var pill = $("#providerCount");
     if (pill) pill.textContent = count + " configured";
@@ -2157,6 +2181,7 @@
   }
 
   function setAgentOpen(open) {
+    if (document.querySelector(".qshell")) open = true;
     settings.agentOpen = open;
     if (open && isDrawer("sidebar") && settings.sidebarOpen) setSidebarOpen(false);
     var panel = $("#agentPanel");
@@ -2175,6 +2200,7 @@
 
   /* ============================== DRAWERS ============================== */
   function isDrawer(which) {
+    if (document.querySelector(".qshell")) return false;
     if (which === "agent") return window.matchMedia("(max-width: 1180px)").matches;
     return window.matchMedia("(max-width: 860px)").matches;
   }
@@ -2235,15 +2261,28 @@
     $$(".abtn[data-view]").forEach(function (b) {
       b.addEventListener("click", function () {
         var v = b.getAttribute("data-view");
+        var titles = { explorer: "Explorer", search: "Search", scm: "Changes", debug: "Run and Debug", extensions: "Extensions", skills: "Knowledge Center" };
+        if (window.Shell && !$("#qDrawer").hidden) {
+          Shell.openView(v, titles[v] || "Panel");
+          return;
+        }
         if (v === state.view && settings.sidebarOpen) setSidebarOpen(false);
         else activateView(v);
         syncDrawerChrome();
       });
     });
-    $("#abtnAgent").addEventListener("click", function () { setAgentOpen(!settings.agentOpen); syncDrawerChrome(); });
+    $("#abtnAgent").addEventListener("click", function () {
+      if (window.Shell && !$("#qDrawer").hidden) {
+        Shell.closeView();
+        if (window.Agent) Agent.focusInput();
+        return;
+      }
+      setAgentOpen(!settings.agentOpen);
+      syncDrawerChrome();
+    });
     $("#abtnSettings").addEventListener("click", function () { openSettings(null); });
     $("#abtnAccount").addEventListener("click", function () {
-      toast({ title: "HugMoss Code", msg: "Built by IRAGUHA Vincent · browser IDE with your own folder and API key", type: "agent", timeout: 5200 });
+      if (window.Shell && Shell.about) Shell.about();
     });
 
     $$(".menubar__item").forEach(function (b) {
@@ -2320,7 +2359,12 @@
         else if (a === "terminal") { setPanelOpen(true); setPanelTab("terminal"); if (window.Terminal) Terminal.focus(); }
       });
     });
-    $("#welcomeAgentCard").addEventListener("click", function () { setAgentOpen(true); syncDrawerChrome(); if (window.Agent) Agent.focusInput(); });
+    $("#welcomeAgentCard").addEventListener("click", function () {
+      if (window.Shell && Shell.editorOpen()) Shell.closeEditor();
+      setAgentOpen(true);
+      syncDrawerChrome();
+      if (window.Agent) Agent.focusInput();
+    });
 
     /* panel */
     $$(".ptab").forEach(function (t) {
@@ -2368,7 +2412,7 @@
       if (e.key === "ArrowDown") { e.preventDefault(); paletteState.sel = Math.min(paletteState.sel + 1, paletteState.rows.length - 1); renderPalette(); scrollPaletteSel(); }
       else if (e.key === "ArrowUp") { e.preventDefault(); paletteState.sel = Math.max(paletteState.sel - 1, 0); renderPalette(); scrollPaletteSel(); }
       else if (e.key === "Enter") { e.preventDefault(); acceptPalette(); }
-      else if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePalette(); }
     });
     $("#paletteOverlay").addEventListener("click", function (e) { if (e.target === this) closePalette(); });
 
@@ -2401,7 +2445,6 @@
     });
 
     $("#scrim").addEventListener("click", closeDrawers);
-    $("#agentCloseBtn").addEventListener("click", function () { setAgentOpen(false); });
 
     /* drag and drop */
     var dragDepth = 0;
@@ -2441,7 +2484,7 @@
       if (tab && tab.kind === "file") renderMinimap();
     });
     initResize("#sidebarResize", function () { return settings.sbW; }, function (v) { settings.sbW = v; }, "x", "--sb-w", 200, 460, "sbW");
-    initResize("#agentResize", function () { return settings.agW; }, function (v) { settings.agW = v; }, "x", "--ag-w", 320, 560, "agW");
+    initResize("#agentResize", function () { return settings.agW; }, function (v) { settings.agW = v; }, "x", "--ag-w", 360, 900, "agW");
     initResize("#panelResize", function () { return settings.panelH; }, function (v) { settings.panelH = v; }, "y", "--panel-h", 120, 420, "panelH");
 
     document.addEventListener("keydown", onGlobalKeys);
@@ -2516,30 +2559,39 @@
       if (!$("#ctxMenu").hidden) { hideCtxMenu(); return; }
       if (!$("#notifPopover").hidden) { $("#notifPopover").hidden = true; return; }
       if (openMenu) { hideMenu(); return; }
+      if (document.querySelector(".pop")) { if (window.Agent && Agent.closePops) Agent.closePops(); return; }
+      if (!$("#qMenu").hidden) {
+        $("#qMenu").hidden = true;
+        var moreBtn = $("#qBMore");
+        if (moreBtn) moreBtn.setAttribute("aria-expanded", "false");
+        return;
+      }
+      if (window.Shell && Shell.escape()) return;
       if ($("#app").classList.contains("has-drawer")) closeDrawers();
       return;
     }
+    if (mod && e.shiftKey && key === "b") { e.preventDefault(); if (window.Shell) Shell.toggleBrowser(); return; }
+    if (mod && !e.shiftKey && key === "b") { e.preventDefault(); if (window.Shell) Shell.toggleNav(); return; }
     if (mod && e.shiftKey && key === "p") { e.preventDefault(); openPalette("commands", ">"); return; }
     if (mod && key === "k") { e.preventDefault(); openPalette("files", ""); return; }
-    if (mod && e.shiftKey && key === "f") { e.preventDefault(); activateView("search"); return; }
+    if (mod && e.shiftKey && key === "f") { e.preventDefault(); if (window.Shell) Shell.openView("search", "Search"); else activateView("search"); return; }
     if (mod && e.shiftKey && key === "s") { e.preventDefault(); saveAll(); return; }
     if (mod && key === "s") { e.preventDefault(); saveActive(); return; }
     if (mod && key === "o") { e.preventDefault(); openFolderFlow(); return; }
     if (mod && !e.shiftKey && e.key === "`") {
       e.preventDefault();
-      if (!settings.panelOpen) setPanelOpen(true);
-      setPanelTab("terminal");
+      showPanelInEditor("terminal");
       if (window.Terminal) Terminal.focus();
       return;
     }
     if (e.altKey && !mod) {
-      if (key === "b") { e.preventDefault(); setSidebarOpen(!settings.sidebarOpen); syncDrawerChrome(); return; }
-      if (key === "a") { e.preventDefault(); setAgentOpen(!settings.agentOpen); syncDrawerChrome(); return; }
-      if (key === "j") { e.preventDefault(); setPanelOpen(!settings.panelOpen); return; }
+      if (key === "b") { e.preventDefault(); if (window.Shell) Shell.toggleNav(); else { setSidebarOpen(!settings.sidebarOpen); syncDrawerChrome(); } return; }
+      if (key === "a") { e.preventDefault(); if (window.Shell && window.Agent) { Agent.focusInput(); return; } setAgentOpen(!settings.agentOpen); syncDrawerChrome(); return; }
+      if (key === "j") { e.preventDefault(); if (window.Shell && !Shell.editorOpen()) showPanelInEditor(settings.panelTab || "terminal"); else setPanelOpen(!settings.panelOpen); return; }
       if (key === "t") { e.preventDefault(); toggleTheme(); return; }
       if (key === "e") { e.preventDefault(); saveAll(); return; }
       if (key === "p") { e.preventDefault(); openPalette("files", ""); return; }
-      if (key === "z") { e.preventDefault(); activateView("scm"); return; }
+      if (key === "z") { e.preventDefault(); if (window.Shell) Shell.openView("scm", "Changes"); else activateView("scm"); return; }
     }
   }
 
@@ -2600,9 +2652,14 @@
 
     Providers.probeGateway().then(function (on) {
       updateGatewayNote();
+      var active = document.activeElement;
+      var editingKey = active && active.hasAttribute && active.hasAttribute("data-key") && active.value;
+      if (!editingKey) renderProviders();
+      renderProviderSummary();
+      refreshAgentUI();
       logOutput(
         "hugmoss",
-        on ? "ready · gateway connected · keys are forwarded per request" : "ready · direct mode · keys and files stay in this browser",
+        on ? "ready · gateway connected · provider keys can come from the browser or the server" : "ready · direct mode · keys and files stay in this browser",
         "out-info"
       );
     });
@@ -2610,9 +2667,12 @@
       document.fonts.ready.then(function () { renderMinimap(); });
     }
     setTimeout(function () {
+      var hosted = Providers.list().some(function (p) { return Providers.hosted(p.id); });
       toast({
         title: "HugMoss Code",
-        msg: "Built by IRAGUHA Vincent · open a folder, then connect a provider in Settings to start the agent.",
+        msg: "Built by IRAGUHA Vincent · " + (hosted
+          ? "open a folder, then pick a model to start."
+          : "open a folder, then connect a provider in Settings to start the agent."),
         type: "agent",
         timeout: 7000
       });
@@ -2637,6 +2697,8 @@
     openFolder: openFolderFlow,
     openFiles: openFilesFlow,
     openSettings: openSettings,
+    closeSettingsUI: closeSettingsUI,
+    showPanel: showPanelInEditor,
     downloadPath: downloadPath,
     treeRefresh: function () { renderTree(); renderScm(); renderTimeline(); },
     filesChanged: function (path) {

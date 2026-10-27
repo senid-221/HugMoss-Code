@@ -2,7 +2,7 @@
 
 <p align="center"><img src="assets/img/hugmoss-128.png" width="96" height="96" alt="HugMoss logo"></p>
 
-A browser-based agentic coding IDE. Open a real folder from your disk, edit real files, and talk to a real language model through your own API key — with an agent that reads, searches, plans, and writes files under your approval.
+A browser-based agentic coding workspace. It opens with a task rail, an agent conversation, and a live browser pane; the editor appears when you open a file. Open a real folder from your disk, edit real files, and talk to a real language model — with your own API key, or with keys a deployment supplies — and an agent that reads, searches, plans, and writes files under your approval.
 
 HugMoss runs in two modes:
 
@@ -16,24 +16,50 @@ There are no runtime dependencies, no framework, and no build step beyond copyin
 ## What is real
 
 - **The workspace** is your folder. HugMoss uses the File System Access API to read and write files in place. File contents are never uploaded to a HugMoss service.
-- **The agent** calls the selected provider with your key. In gateway mode the key is forwarded per request by your own server; in direct mode it goes straight from the tab to the provider. No key is stored server-side.
+- **The agent** calls the selected provider with your key, or with a key the gateway holds in its environment. A key sent from the browser always takes precedence. No key is stored server-side by the request path, and a hosted key is never exposed to visitors.
 - **The changes view** compares your session edits against the folder contents from the moment you opened it, and against what is currently on disk.
 - **The terminal** is a file shell over the open folder. It lists, reads, and searches files; it does not execute programs.
 
 ## What is honest
 
-A browser tab cannot spawn processes, attach a debugger, run a language server, or execute `git`. HugMoss does not pretend otherwise. Builds, tests, git operations, and long-running servers belong in your own terminal; the UI tells you so where it matters.
+A browser tab cannot spawn processes, attach a debugger, run a language server, or execute `git`. HugMoss does not pretend otherwise. Builds, tests, git operations, and long-running servers belong in your own terminal; the UI tells you so where it matters. The Browser pane is an iframe, so sites that send `X-Frame-Options` or a restrictive `frame-ancestors` policy refuse to render; local previews and embeddable sites work.
 
 ## Highlights
 
-- **Explorer** — real folder tree with file-type icons, dirty markers, outline and timeline, new file/folder, refresh and collapse.
-- **Editor** — editable tabs, syntax highlighting for 11 languages, live breadcrumb trail, outline, canvas minimap, word wrap, configurable font size, and unsaved-change protection.
-- **Search** — cross-file search with match case, whole word and regular-expression toggles, grouped results and hit counts.
-- **Changes** — per-session diffs against the folder baseline, unified diff view, revert a file, save individual files or everything.
-- **Terminal** — multi-session file shell with history, tab completion, syntax colouring and `open`/`download`/`tree` helpers.
-- **Agent** — Ask / Agent / Plan modes, streamed prose, structured todos, expandable tool cards, per-edit approval with inline diffs, stop control, and session history.
-- **NVIDIA Skills** — a searchable catalogue of the official NVIDIA Agent Skills for AI and machine learning. Activate up to six; their real `SKILL.md` instructions are fetched from `NVIDIA/skills` on GitHub and appended to the agent system prompt on the next request.
-- **Workspace chrome** — command palette, menus, settings, provider manager, notifications, toasts, problems panel, status bar, resizable panes, dark and light themes, responsive drawers.
+- **Task rail** — Coding home, New Task, recent-task history with search, workspace switcher, and direct access to Knowledge Center, Sites, Automations, and Extensions.
+- **Agent workspace** — Ask / Agent / Plan modes, streamed prose, structured todos, expandable tool cards, per-edit approval with inline diffs, stop control, session history, and Markdown export.
+- **Browser pane** — a real resizable preview with its own tab strip, back/forward history, URL bar, device frame, open-in-tab and copy-link actions, plus a start page for the local app and the repository.
+- **Editor** — opens full-screen over the workspace from any file open, with editable tabs, syntax highlighting for 11 languages, breadcrumbs, outline, canvas minimap, word wrap, configurable font size, and unsaved-change protection.
+- **On-demand panels** — Explorer, cross-file Search, session Changes, and the multi-session file shell stay one command away and open in a drawer or the editor instead of occupying the default layout.
+- **NVIDIA Skills** — a searchable catalogue of the official NVIDIA Agent Skills for AI and machine learning. Open it from Knowledge Center, or run **Skills: Open NVIDIA Skills**. Activate up to six; their real `SKILL.md` instructions are fetched from `NVIDIA/skills` on GitHub and appended to the agent system prompt on the next request.
+- **Workspace chrome** — command palette, menus, settings, provider manager, notifications, toasts, problems panel, dark and light themes, and responsive drawers.
+
+## Navigation and links
+
+Every surface has a real URL, so views can be bookmarked, shared, and reached with the browser's back and forward buttons. The app is a single page with a hash router; changing the hash applies the matching view, and an unknown address falls back to `#/task`.
+
+| Route | Opens |
+| --- | --- |
+| `#/task` | The active task, or a new session when none is open |
+| `#/task/<session-id>` | A saved session from this browser's history |
+| `#/editor?path=<file>` | The full-screen editor for a workspace file |
+| `#/terminal` | The editor surface with the Terminal panel selected |
+| `#/browser` | The browser pane; add `?url=<address>` to load a page |
+| `#/explorer` | Explorer in the drawer |
+| `#/search` | Cross-file search in the drawer |
+| `#/changes` | Session changes in the drawer |
+| `#/knowledge` | Knowledge Center in the drawer |
+| `#/extensions` | Extensions in the drawer |
+| `#/settings` | Settings |
+| `#/help` | Keyboard shortcuts |
+| `#/about` | About HugMoss Code |
+| `#/automations` | Automations explanation |
+
+Programmatic navigation replaces or pushes the same hash, so opening a file in the editor, switching drawer views, and typing a browser address all keep the URL in sync. While you browse inside the preview pane, its address replaces the current history entry rather than adding one per page.
+
+Workspace files are read through the File System Access API, and a browser cannot restore that permission on its own. An `#/editor` deep link opens the editor shell immediately and fills in the file as soon as you open the folder.
+
+The title-bar window controls map to browser behaviour: minimize enters focus mode (the agent and browser panes collapse, `Esc` restores them), maximize requests fullscreen for the page, and close explains that a tab can only be closed by the browser itself.
 
 ## Run it
 
@@ -65,7 +91,7 @@ python -m http.server 8080
 npx serve .
 ```
 
-Then visit `http://localhost:8080`. At startup the app probes `/api/health`; when no gateway answers, it falls back to direct browser calls. Direct mode requires provider CORS support — see [CORS](#cors-and-direct-mode).
+Then visit `http://localhost:8080`. At startup the app probes `/api/health`; when no gateway answers, it falls back to direct browser calls. Direct mode requires provider CORS support — see [CORS](#cors-and-direct-mode). Hosted keys are a gateway feature, so a static-only deployment is bring-your-own-key.
 
 Chrome or Edge is required for folder write access. Firefox and Safari fall back to read-only file picking, drag-and-drop, and the editor without disk writes.
 
@@ -96,6 +122,26 @@ Keys stay in the browser's `localStorage`, as before. For a gateway request, the
 
 Custom OpenAI-compatible endpoints deliberately stay in direct mode. Proxying arbitrary user-supplied URLs would turn the gateway into an SSRF vector.
 
+#### Hosted keys
+
+A deployment can hold provider keys in its environment so visitors only choose a provider and a model. When a request arrives without `x-hugmoss-key`, the gateway uses the matching environment variable. A key entered in the app still wins, per visitor. `/api/health` reports one boolean per provider and never a key value.
+
+| Variable | Provider |
+| --- | --- |
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Google Gemini |
+| `XAI_API_KEY` | xAI |
+| `MISTRAL_API_KEY` | Mistral AI |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `GROQ_API_KEY` | Groq |
+| `OPENROUTER_API_KEY` | OpenRouter |
+| `TOGETHER_API_KEY` | Together AI |
+| `NVIDIA_API_KEY` or `NVIDIA_NIM_API_KEY` | NVIDIA NIM |
+| `PERPLEXITY_API_KEY` | Perplexity |
+
+Only configure the ones you want to share. Anyone who can reach the deployment can spend these keys, so keep `RATE_LIMIT` low on a public site and protect it when it is not meant to be open.
+
 ### Configuration
 
 All variables are optional.
@@ -123,6 +169,47 @@ The gateway is a standard Node HTTP server, so any Node 20+ host works. Use:
 On Render, Railway, Fly.io, or a VPS, set `PORT` if the platform requires it. `HOST=0.0.0.0` is the default so container routing works. For Ollama on a platform, point `OLLAMA_URL` at a reachable Ollama host — `localhost` inside a container is not your laptop.
 
 The gateway has no user accounts. If you expose it publicly, put it behind your platform's access control or an authenticating reverse proxy. It is designed for single-user or trusted-team use.
+
+#### Vercel
+
+Vercel never runs a long-lived `npm start`, so this repository ships `vercel.json` and a Node function at `api/[...path].js`. The app is served as static output and `/api/*` runs as one serverless function.
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | Other |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Install command | default (`npm install`) |
+| Start command | none — Vercel calls `api/[...path].js` |
+
+Import the repository in the Vercel dashboard and keep the detected build settings, or deploy from the CLI:
+
+```bash
+npx vercel        # preview deployment
+npx vercel --prod # production deployment
+```
+
+Set these in **Project → Settings → Environment Variables** for Production and Preview:
+
+| Variable | Value | Effect |
+| --- | --- | --- |
+| `TRUST_PROXY` | `1` | Without it every request carries the function's own address and the rate limiter treats all visitors as one client |
+| `BODY_LIMIT` | `4000000` | Vercel rejects bodies over 4.5 MB before the function runs; keep this below that |
+| `RATE_LIMIT` | `120` | Requests per minute per IP. On serverless this is per instance, so treat it as best effort |
+| `ALLOWED_ORIGINS` | optional | Only needed when a different origin, such as a locally served copy, must call this deployment's `/api` |
+| `OLLAMA_URL` | optional | Address of a reachable Ollama host. On Vercel `127.0.0.1` is the function itself, so a local Ollama stays unreachable |
+
+**Provider keys are optional.** Add any of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `NVIDIA_API_KEY` or `PERPLEXITY_API_KEY` to the same Environment Variables screen. With a key present, visitors just pick that provider and a model — no key prompt. A key a visitor enters in Settings overrides the hosted one for that browser only. Leave them unset for bring-your-own-key.
+
+Because a hosted key is spent by anyone who can reach the site, set `RATE_LIMIT=20` or lower, and enable Deployment Protection unless the deployment is meant to be public. Keys are attached inside the function and never appear in `/api/health` or in any response.
+
+Behaviour worth knowing:
+
+- **Ollama needs the local gateway.** A deployed site cannot reach `localhost:11434` on your machine. Run `npm start` locally for Ollama, or set `OLLAMA_URL` to a publicly reachable Ollama host.
+- **Streaming is preserved.** The function pipes provider SSE through without buffering, and allows up to 300 seconds per request, which is the Hobby plan maximum.
+- **localStorage is per origin.** Keys, model choice and active skills saved on `localhost` do not appear on the deployment; add them once there.
+- **Serverless state.** Nothing needs to persist server-side, so instance recycling is harmless. Rate-limit buckets are in memory and reset with the instance.
+- **Public access.** The app has no accounts and rate limiting is per instance. Use Vercel's Deployment Protection, or keep the deployment private, if you do not want the relay reachable by others.
 
 ## Connect an AI provider
 
@@ -193,7 +280,7 @@ In direct mode, provider calls originate in your browser, so the provider must a
 
 HugMoss ships a browser for the official NVIDIA Agent Skills for AI and machine learning. The catalogue mirrors the AI/ML filter on [build.nvidia.com/skills](https://build.nvidia.com/skills?filters=domain%3Adomain_ai_and_machine_learning): 226 skills across Agentic AI, Training AI, Inference AI, Vision AI, Conversational AI, and Simulation and Modeling.
 
-- Open the graduation-cap icon in the activity bar, or run **Skills: Open NVIDIA Skills** from the command palette.
+- Open Knowledge Center in the task rail, or run **Skills: Open NVIDIA Skills** from the command palette.
 - Search by name or description, filter by group or by active skills, and expand a row for its summary, install command, and source link.
 - Activate up to six skills. HugMoss fetches that skill's real `SKILL.md` from the public `NVIDIA/skills` GitHub repository, strips the YAML frontmatter, and caches the body in `localStorage`.
 - On the next agent request, active instruction bodies are appended to the system prompt inside an `<nvidia_skills>` block, capped at 14,000 characters per skill and 24,000 characters in total. If a fetch fails, the skill's catalogue description is sent instead and the row offers **Retry**.
@@ -237,13 +324,15 @@ The agent runs until it answers, calls a tool, or you press Stop. A session keep
 | Save file | `Ctrl+S` |
 | Save all | `Ctrl+Shift+S` or `Alt+E` |
 | Open folder | `Ctrl+O` |
-| Toggle terminal | `` Ctrl+` `` |
-| Toggle sidebar | `Alt+B` |
-| Toggle panel | `Alt+J` |
-| Toggle agent chat | `Alt+A` |
+| Open terminal | `` Ctrl+` `` |
+| Toggle task rail | `Ctrl+B` or `Alt+B` |
+| Toggle browser pane | `Ctrl+Shift+B` |
+| Focus browser address | `Ctrl+L` |
+| Open changes | `Alt+Z` |
 | Toggle theme | `Alt+T` |
+| Focus agent chat | `Alt+A` |
+| Toggle editor panel | `Alt+J` |
 | Search in files | `Ctrl+Shift+F` |
-| Changes view | `Alt+Z` |
 | Dismiss overlay / drawer | `Esc` |
 
 Some chords use `Alt` because browsers reserve `Ctrl+B`, `Ctrl+J` and `Ctrl+P`.
@@ -281,11 +370,16 @@ assets/js/fs.js         File System Access workspace, fallbacks, diff baselines
 assets/js/ai.js         SSE transport for OpenAI-compatible, Anthropic and Gemini APIs
 assets/js/icons.js      interface and file-type icons
 assets/js/highlight.js  syntax tokenizer and LCS line diff
-assets/js/app.js        tabs, editor, minimap, explorer, search, changes, palette, settings
+assets/js/shell.js      three-pane shell: task rail, history, drawer, editor overlay, browser toggle
+assets/js/browser.js    browser pane: tabs, address bar, history, device frame, actions
+assets/js/app.js        editor, explorer, search, changes, palette, settings, keyboard map
 assets/js/terminal.js   file shell and command implementations
 assets/js/agent.js      agent loop, tools, approvals, todos and message rendering
-server/index.js         HTTP server, static assets, provider and Ollama proxy
+server/index.js         local Node server: static assets plus the API router
+server/app.js           API router, provider and Ollama proxy
 server/providers.js     upstream allowlist and auth-header construction
+api/[...path].js        Vercel serverless entry point for /api/*
+vercel.json             Vercel build, function duration and response headers
 scripts/build.js        copies index.html and assets/ into dist/
 package.json            build, dev and start scripts; no dependencies
 ```
@@ -317,7 +411,7 @@ The last folder handle is stored in IndexedDB (`hugmoss-workspace`) so it can be
 
 ## Design
 
-Graphite surfaces with a violet signal colour, Inter for interface text and JetBrains Mono for code. Both themes are driven by CSS custom properties, including re-tuned syntax colours for light mode. Panes resize by dragging, and the layout becomes drawers below 1180px (agent) and 860px (sidebar).
+The default view follows the agent-workspace pattern: a light task rail on the left, the conversation in the middle, and the browser on the right, under a compact 60px title bar. The editor is a full-screen surface that keeps the same title bar; drawers carry Explorer, Search, Changes, Extensions, and Knowledge Center. Graphite type, Inter for interface text and JetBrains Mono for code, with a blue selection signal and a yellow workspace accent. Both themes are driven by CSS custom properties, including re-tuned syntax colours for light mode. The pane layout collapses to two columns at 1180px, the task rail becomes a drawer at 900px, and the browser bar wraps at 620px.
 
 ## Known limitations
 
